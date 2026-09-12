@@ -19,6 +19,9 @@
 - 保持 SukiSU Ultra 5.10+ SELinux hide 实现和现有 SUSFS inline hook 路径不变。
 - 如果 SUSFS 已提供新版 SELinux hide hook，则直接复用；否则使用 ReSukiSU 风格的运行时 function/LSM slot patch。
 - `kernel/Makefile` 保留官方 builtin 的版本/UAPI 契约；GitHub API 或 `main` 引用不可用时使用本地提交计数或 `VERSION_BASE`，避免错误回退到管理器拒绝的 `KSU_VERSION=13000`。
+- 兼容旧版 Manager 的 app-profile v2/v3 ioctl：按用户空间版本读写 776 字节前缀，并迁移到当前 v4 profile。
+- `post-fs-data` 在 observer 注册后增加一次性 manager UID 扫描，覆盖 `packages.list` 已存在的旧版 Android 启动时序。
+- Non-GKI 的每条 SELinux policy 更新路径都会刷新 SUSFS SID 缓存；原补丁的 `kernel/selinux/rules.c` hunk 不会覆盖实际编译的 `kernel/non_gki/rules.c`，已按实际入口移植。
 
 ## 集成到内核源码树
 
