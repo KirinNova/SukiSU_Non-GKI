@@ -18,6 +18,7 @@
 - 修复 4.9 缺失的 `fallthrough`、`current_sid()`、`strncpy_from_user_nofault()` 和 kernel umount feature setter。
 - 保持 SukiSU Ultra 5.10+ SELinux hide 实现和现有 SUSFS inline hook 路径不变。
 - 如果 SUSFS 已提供新版 SELinux hide hook，则直接复用；否则使用 ReSukiSU 风格的运行时 function/LSM slot patch。
+- `kernel/Makefile` 保留官方 builtin 的版本/UAPI 契约；GitHub API 或 `main` 引用不可用时使用本地提交计数或 `VERSION_BASE`，避免错误回退到管理器拒绝的 `KSU_VERSION=13000`。
 
 ## 集成到内核源码树
 
