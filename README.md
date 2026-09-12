@@ -73,7 +73,14 @@ curl -LSs https://raw.githubusercontent.com/xiziya/SukiSU_Non-GKI/builtin/kernel
 ## 许可证以及鸣谢名单
 
 沿用上游项目的 GPL-2.0 许可证，详见 `LICENSE`。
-鸣谢以下人员对本项目的贡献:
-@JackAltMan
+## 🙏 鸣谢
+
+感谢所有为本项目提供帮助、建议、代码贡献的朋友：
+
+- @JackAltMan 
+
+> 特别感谢开源社区相关项目带来的启发。
+
+
 
 
