@@ -14,7 +14,51 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\n' "$OUT_DIR" >> "$GITHUB
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
 make O="$out" "${config_targets[@]}"
+# Integration changes add Kconfig entries after the vendor defconfig has been
+# loaded. Explicitly enable the requested KernelSU/SUSFS features in the
+# generated output config so a vendor '# CONFIG_KSU is not set' cannot disable
+# the integrated driver. The source defconfig remains untouched.
+if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
+  set_config() {
+    local key=$1 value=$2
+    sed -i -E "/^(# )?${key}(=.*| is not set)$/d" "$out/.config"
+    printf '%s=%s\n' "$key" "$value" >> "$out/.config"
+  }
+  set_config CONFIG_KSU y
+  set_config CONFIG_KSU_SUSFS y
+  set_config CONFIG_KSU_SUSFS_SUS_PATH y
+  set_config CONFIG_KSU_SUSFS_SUS_MOUNT y
+  set_config CONFIG_KSU_SUSFS_SUS_KSTAT y
+  set_config CONFIG_KSU_SUSFS_SPOOF_UNAME y
+  set_config CONFIG_KSU_SUSFS_ENABLE_LOG y
+  set_config CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS y
+  set_config CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
+  set_config CONFIG_KSU_SUSFS_OPEN_REDIRECT y
+  set_config CONFIG_KSU_SUSFS_SUS_MAP y
+fi
 if [[ "${DISABLE_LTO_REQUESTED:-false}" == true ]]; then for key in CONFIG_LTO CONFIG_LTO_CLANG CONFIG_LTO_CLANG_THIN CONFIG_LTO_CLANG_FULL CONFIG_THINLTO; do sed -i "s/^${key}=y/# ${key} is not set/" "$out/.config"; done; echo CONFIG_LTO_NONE=y >> "$out/.config"; fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
 sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"; make O="$out" olddefconfig
+if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
+  required_configs=(
+    CONFIG_KSU CONFIG_KSU_SUSFS CONFIG_KSU_SUSFS_SUS_PATH
+    CONFIG_KSU_SUSFS_SUS_MOUNT CONFIG_KSU_SUSFS_SUS_KSTAT
+    CONFIG_KSU_SUSFS_SPOOF_UNAME CONFIG_KSU_SUSFS_ENABLE_LOG
+    CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+    CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+    CONFIG_KSU_SUSFS_OPEN_REDIRECT CONFIG_KSU_SUSFS_SUS_MAP
+  )
+  for key in "${required_configs[@]}"; do
+    grep -q "^${key}=y$" "$out/.config" || {
+      echo "[ERROR] integrated configuration did not enable ${key}; check its Kconfig dependencies" >&2
+      exit 1
+    }
+  done
+  if grep -Rqs '^config KSU_MANUAL_HOOK$' drivers/kernelsu; then
+    set_config CONFIG_KSU_MANUAL_HOOK y
+    make O="$out" olddefconfig
+  else
+    echo '[INFO] CONFIG_KSU_MANUAL_HOOK is not defined by this SukiSU Ultra source; SUSFS inline hooks remain enabled.'
+  fi
+fi
 release=$(make O="$out" -s kernelrelease); [[ ${#release} -le 64 ]] || { echo "[ERROR] kernelrelease is ${#release} characters (>64): $release" >&2; exit 1; }; echo "KERNEL_RELEASE=$release" >> "$GITHUB_ENV"
