@@ -76,7 +76,7 @@ curl -LSs https://raw.githubusercontent.com/xiziya/SukiSU_Non-GKI/builtin/kernel
 ## 🙏 鸣谢
 感谢所有为本项目提供帮助、建议、代码贡献的朋友：
 
-- [@JackA1tMan](https://github.com/JackA1tMan)
+- [@JackA1ltMan](https://github.com/JackA1ltMan)
 - [@KirinNova](https://github.com/KirinNova)
 - [@ShirkNeko](https://github.com/ShirkNeko)（SukiSU上游）
 
