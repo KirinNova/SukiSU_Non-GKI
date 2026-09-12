@@ -70,6 +70,10 @@ curl -LSs https://raw.githubusercontent.com/xiziya/SukiSU_Non-GKI/builtin/kernel
 
 验证使用 clang 12、arm64 GCC 交叉工具链、`vendor/xiaomi/mi845_defconfig` 和 `vendor/xiaomi/dipper.config`。具体结果见 `docs/verification.md`。
 
-## 许可证
+## 许可证以及鸣谢名单
 
 沿用上游项目的 GPL-2.0 许可证，详见 `LICENSE`。
+鸣谢以下人员对本项目的贡献:
+@JackAltMan
+
+
