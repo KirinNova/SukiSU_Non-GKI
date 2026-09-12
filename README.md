@@ -23,6 +23,8 @@
 - `post-fs-data` 在 observer 注册后增加一次性 manager UID 扫描，覆盖 `packages.list` 已存在的旧版 Android 启动时序。
 - Non-GKI 的每条 SELinux policy 更新路径都会刷新 SUSFS SID 缓存；原补丁的 `kernel/selinux/rules.c` hunk 不会覆盖实际编译的 `kernel/non_gki/rules.c`，已按实际入口移植。
 
+这些兼容修改已经直接合并在本仓库源码中。GitHub Actions 会从当前 checkout 直接运行 `kernel/setup.sh`，不再额外应用 Manager 兼容补丁，避免重复修改或上下文冲突。
+
 ## 集成到内核源码树
 
 在内核源码根目录运行：
