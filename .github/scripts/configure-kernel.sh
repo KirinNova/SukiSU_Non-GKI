@@ -14,16 +14,28 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\n' "$OUT_DIR" >> "$GITHUB
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
 make O="$out" "${config_targets[@]}"
+set_config() {
+  local key=$1 value=$2
+  sed -i -E "/^(# )?${key}(=.*| is not set)$/d" "$out/.config"
+  if [[ "$value" == n ]]; then
+    printf '# %s is not set\n' "$key" >> "$out/.config"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$out/.config"
+  fi
+}
+apply_config_fragment() {
+  local fragment=$1 line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^(CONFIG_[A-Za-z0-9_]+)=(y|m|n)$ ]] || continue
+    key=${BASH_REMATCH[1]}; value=${BASH_REMATCH[2]}
+    set_config "$key" "$value"
+  done < "$fragment"
+}
 # Integration changes add Kconfig entries after the vendor defconfig has been
 # loaded. Explicitly enable the requested KernelSU/SUSFS features in the
 # generated output config so a vendor '# CONFIG_KSU is not set' cannot disable
 # the integrated driver. The source defconfig remains untouched.
 if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
-  set_config() {
-    local key=$1 value=$2
-    sed -i -E "/^(# )?${key}(=.*| is not set)$/d" "$out/.config"
-    printf '%s=%s\n' "$key" "$value" >> "$out/.config"
-  }
   set_config CONFIG_KSU y
   set_config CONFIG_KSU_SUSFS y
   set_config CONFIG_KSU_SUSFS_SUS_PATH y
@@ -35,6 +47,11 @@ if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
   set_config CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
   set_config CONFIG_KSU_SUSFS_OPEN_REDIRECT y
   set_config CONFIG_KSU_SUSFS_SUS_MAP y
+fi
+if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
+  droidspaces_fragment="arch/${ARCH:-arm64}/configs/droidspaces.config"
+  [[ -f "$droidspaces_fragment" ]] || { echo "[ERROR] DroidSpaces config fragment is missing: $droidspaces_fragment" >&2; exit 1; }
+  apply_config_fragment "$droidspaces_fragment"
 fi
 if [[ "${DISABLE_LTO_REQUESTED:-false}" == true ]]; then for key in CONFIG_LTO CONFIG_LTO_CLANG CONFIG_LTO_CLANG_THIN CONFIG_LTO_CLANG_FULL CONFIG_THINLTO; do sed -i "s/^${key}=y/# ${key} is not set/" "$out/.config"; done; echo CONFIG_LTO_NONE=y >> "$out/.config"; fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
@@ -60,5 +77,21 @@ if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
   else
     echo '[INFO] CONFIG_KSU_MANUAL_HOOK is not defined by this SukiSU Ultra source; SUSFS inline hooks remain enabled.'
   fi
+fi
+if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
+  droidspaces_required_configs=(
+    CONFIG_NAMESPACES CONFIG_PID_NS CONFIG_UTS_NS CONFIG_IPC_NS
+    CONFIG_SECCOMP CONFIG_SECCOMP_FILTER CONFIG_CGROUPS
+    CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS CONFIG_MEMCG
+    CONFIG_CGROUP_SCHED CONFIG_CGROUP_FREEZER CONFIG_DEVTMPFS
+    CONFIG_OVERLAY_FS CONFIG_NET_NS CONFIG_VETH CONFIG_BRIDGE
+    CONFIG_NETFILTER CONFIG_NF_CONNTRACK CONFIG_IP_NF_IPTABLES
+  )
+  for key in "${droidspaces_required_configs[@]}"; do
+    grep -q "^${key}=y$" "$out/.config" || {
+      echo "[ERROR] DroidSpaces configuration did not enable ${key}; check this kernel's Kconfig dependencies" >&2
+      exit 1
+    }
+  done
 fi
 release=$(make O="$out" -s kernelrelease); [[ ${#release} -le 64 ]] || { echo "[ERROR] kernelrelease is ${#release} characters (>64): $release" >&2; exit 1; }; echo "KERNEL_RELEASE=$release" >> "$GITHUB_ENV"
