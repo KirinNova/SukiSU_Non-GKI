@@ -1,0 +1,187 @@
+name: Build custom Non-GKI kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      codename:
+        description: Device codename, for example dipper
+        required: true
+        type: string
+      kernel_repo:
+        description: Complete clean kernel repository URL ending in .git
+        required: true
+        type: string
+      kernel_branch:
+        description: Kernel branch
+        required: false
+        default: bka
+        type: string
+      defconfig:
+        description: Path ending in _defconfig; blank means unique codename auto-detection
+        required: false
+        type: string
+      device_config:
+        description: Optional path ending in .config
+        required: false
+        type: string
+      arch:
+        description: Kernel architecture
+        required: false
+        default: arm64
+        type: string
+      build_target:
+        description: Kernel make target
+        required: false
+        default: Image.gz-dtb
+        type: string
+      author:
+        description: Custom author name
+        required: true
+        default: XiZi
+        type: string
+      ab_partition:
+        description: Is this an A/B slot device?
+        required: true
+        type: boolean
+      disable_lto:
+        description: Disable LTO optimization
+        required: true
+        type: boolean
+      integrate_susfs:
+        description: Integrate latest SUSFS and this repository's SukiSU compatibility
+        required: true
+        type: boolean
+      kernel_name:
+        description: Kernel name; blank defaults to by_XiZi
+        required: false
+        default: by_XiZi
+        type: string
+      build_time:
+        description: Build timestamp in ISO-8601; blank means current UTC
+        required: false
+        type: string
+      kernel_version:
+        description: Custom kernel version suffix, for example v1.0
+        required: false
+        default: v1.0
+        type: string
+      integrate_droidspaces:
+        description: Integrate DroidSpaces kernel support and latest runtime assets
+        required: true
+        type: boolean
+      package_ak3:
+        description: Package an AnyKernel3 flashable zip
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      CODENAME: ${{ inputs.codename }}
+      KERNEL_REPO: ${{ inputs.kernel_repo }}
+      KERNEL_BRANCH: ${{ inputs.kernel_branch }}
+      DEFCONFIG: ${{ inputs.defconfig }}
+      DEVICE_CONFIG: ${{ inputs.device_config }}
+      ARCH: ${{ inputs.arch }}
+      BUILD_TARGET: ${{ inputs.build_target }}
+      AUTHOR: ${{ inputs.author }}
+      AB_PARTITION: ${{ inputs.ab_partition }}
+      DISABLE_LTO: ${{ inputs.disable_lto }}
+      INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
+      KERNEL_NAME: ${{ inputs.kernel_name }}
+      BUILD_TIME: ${{ inputs.build_time }}
+      KERNEL_VERSION: ${{ inputs.kernel_version }}
+      INTEGRATE_DROIDSPACES: ${{ inputs.integrate_droidspaces }}
+      PACKAGE_AK3: ${{ inputs.package_ak3 }}
+      ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+    steps:
+      - name: Checkout compatibility source
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        shell: bash
+        run: bash .github/scripts/validate-inputs.sh
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache clang coccinelle curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git libssl-dev libelf-dev lld make python3 rsync unzip zip
+
+      - name: Fetch clean kernel and patch sources
+        shell: bash
+        run: |
+          git clone --depth=1 --branch "$KERNEL_BRANCH" "$KERNEL_REPO" kernel-source
+          git clone --depth=1 --branch mainline https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git patch-source
+          echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel-source" >> "$GITHUB_ENV"
+          echo "PATCH_ROOT=$GITHUB_WORKSPACE/patch-source/Patches" >> "$GITHUB_ENV"
+          echo "BUILD_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+
+      - name: Detect kernel and configuration
+        shell: bash
+        run: bash .github/scripts/prepare-kernel.sh
+
+      - name: Integrate SukiSU Ultra compatibility
+        if: inputs.integrate_susfs
+        shell: bash
+        run: |
+          cd "$KERNEL_ROOT"
+          KSU_REPO="$GITHUB_WORKSPACE" KSU_BRANCH=builtin sh "$GITHUB_WORKSPACE/kernel/setup.sh"
+
+      - name: Integrate SUSFS and inline hooks
+        shell: bash
+        if: inputs.integrate_susfs
+        run: bash .github/scripts/integrate-susfs.sh
+
+      - name: Integrate DroidSpaces
+        shell: bash
+        if: inputs.integrate_droidspaces
+        run: bash .github/scripts/integrate-droidspaces.sh
+
+      - name: Configure kernel
+        shell: bash
+        run: bash .github/scripts/configure-kernel.sh
+
+      - name: Build kernel
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$KERNEL_ROOT"
+          make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
+          image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
+          [[ -f "$image" ]] || { echo "[ERROR] expected output missing: $image" >&2; exit 1; }
+          cp "$image" "$ARTIFACT_DIR/"
+
+      - name: Package AnyKernel3
+        if: inputs.package_ak3
+        shell: bash
+        run: bash .github/scripts/package-anykernel.sh
+
+      - name: Generate build report
+        if: always()
+        shell: bash
+        run: bash .github/scripts/generate-build-report.sh
+
+      - name: Preserve patch diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$ARTIFACT_DIR/patch-diagnostics"
+          if [[ -d "$KERNEL_ROOT" ]]; then
+            find "$KERNEL_ROOT" -type f \( -name '*.rej' -o -name '*.orig' \) -print -exec cp --parents '{}' "$ARTIFACT_DIR/patch-diagnostics/" \; || true
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.codename }}-sukisu-non-gki
+          path: artifacts/
+          if-no-files-found: error

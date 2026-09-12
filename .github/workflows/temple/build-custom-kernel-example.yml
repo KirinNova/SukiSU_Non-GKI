@@ -1,0 +1,23 @@
+name: Example custom Non-GKI kernel workflow
+
+# GitHub only runs workflow files directly under .github/workflows.
+# This file is a copyable reference template and is intentionally inactive.
+on:
+  workflow_dispatch:
+    inputs:
+      codename: { description: Device codename, required: true, type: string }
+      kernel_repo: { description: Complete .git kernel repository URL, required: true, type: string }
+      defconfig: { description: Path ending _defconfig, required: false, type: string }
+      device_config: { description: Optional path ending .config, required: false, type: string }
+      author: { description: Author, required: true, default: XiZi, type: string }
+      ab_partition: { description: A/B device, required: true, type: boolean }
+      disable_lto: { description: Disable LTO, required: true, type: boolean }
+      integrate_susfs: { description: SUSFS and SukiSU, required: true, type: boolean }
+      kernel_name: { description: Kernel name, required: false, default: by_XiZi, type: string }
+      build_time: { description: ISO-8601 timestamp, required: false, type: string }
+      kernel_version: { description: Kernel version suffix, required: false, default: v1.0, type: string }
+      integrate_droidspaces: { description: DroidSpaces, required: true, type: boolean }
+      package_ak3: { description: AnyKernel3, required: true, type: boolean }
+
+# Copy the job steps from ../build-custom-kernel.yml and adjust toolchain/target
+# for the selected clean kernel tree before enabling this as a real workflow.
