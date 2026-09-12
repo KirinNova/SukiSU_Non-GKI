@@ -1,7 +1,34 @@
 #define SU_PATH "/system/bin/su"
 #define SH_PATH "/system/bin/sh"
 
+#if defined(CONFIG_KSU_SUSFS) && defined(KSU_COMPAT_USE_STATIC_KEY)
+DEFINE_STATIC_KEY_TRUE(ksu_su_compat_enabled);
+
+static bool ksu_su_compat_is_enabled(void)
+{
+    return static_branch_likely(&ksu_su_compat_enabled);
+}
+
+static void ksu_su_compat_set_enabled(bool enable)
+{
+    if (enable)
+        static_branch_enable(&ksu_su_compat_enabled);
+    else
+        static_branch_disable(&ksu_su_compat_enabled);
+}
+#else
 bool ksu_su_compat_enabled __read_mostly = true;
+
+static bool ksu_su_compat_is_enabled(void)
+{
+    return ksu_su_compat_enabled;
+}
+
+static void ksu_su_compat_set_enabled(bool enable)
+{
+    ksu_su_compat_enabled = enable;
+}
+#endif
 
 static const char su_path[] = SU_PATH;
 static const char sh_path[] = SH_PATH;
@@ -9,14 +36,14 @@ static const char ksud_path[] = KSUD_PATH;
 
 static int su_compat_feature_get(u64 *value)
 {
-    *value = ksu_su_compat_enabled ? 1 : 0;
+    *value = ksu_su_compat_is_enabled() ? 1 : 0;
     return 0;
 }
 
 static int su_compat_feature_set(u64 value)
 {
     bool enable = value != 0;
-    ksu_su_compat_enabled = enable;
+    ksu_su_compat_set_enabled(enable);
     pr_info("su_compat: set to %d\n", enable);
     return 0;
 }
@@ -156,6 +183,20 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
     }
 
     ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
+    return 0;
+}
+
+// Legacy SUSFS inline hook scripts call a post handler that current SukiSU
+// no longer needs because the pre handler emits its pending event directly.
+int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv_user, void *envp_user,
+                                      int *flags, int *retval)
+{
+    (void)fd;
+    (void)filename_ptr;
+    (void)argv_user;
+    (void)envp_user;
+    (void)flags;
+    (void)retval;
     return 0;
 }
 

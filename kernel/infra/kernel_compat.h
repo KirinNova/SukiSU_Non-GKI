@@ -32,7 +32,7 @@ static int install_session_keyring(struct key *keyring)
     return commit_creds(new);
 }
 
-struct file *ksu_filp_open_compat(const char *filename, int flags, umode_t mode)
+static inline struct file *ksu_filp_open_compat(const char *filename, int flags, umode_t mode)
 {
     if (init_session_keyring != NULL && !current_cred()->session_keyring && (current->flags & PF_WQ_WORKER)) {
         pr_info("installing init session keyring for older kernel\n");
@@ -92,7 +92,7 @@ static inline long __strncpy_from_user_nofault(char *dst, const void __user *uns
 #endif
 }
 
-long ksu_strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr, long count)
+static inline long ksu_strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr, long count)
 {
     long ret = __strncpy_from_user_nofault(dst, unsafe_addr, count);
 
@@ -114,7 +114,7 @@ long ksu_strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr, lo
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 // https://elixir.bootlin.com/linux/v4.14.336/source/fs/read_write.c#L418
-ssize_t ksu_kernel_read_compat(struct file *p, void *buf, size_t count, loff_t *pos)
+static inline ssize_t ksu_kernel_read_compat(struct file *p, void *buf, size_t count, loff_t *pos)
 {
     mm_segment_t old_fs;
     old_fs = get_fs();
@@ -124,7 +124,7 @@ ssize_t ksu_kernel_read_compat(struct file *p, void *buf, size_t count, loff_t *
     return result;
 }
 // https://elixir.bootlin.com/linux/v4.14.336/source/fs/read_write.c#L512
-ssize_t ksu_kernel_write_compat(struct file *p, const void *buf, size_t count, loff_t *pos)
+static inline ssize_t ksu_kernel_write_compat(struct file *p, const void *buf, size_t count, loff_t *pos)
 {
     mm_segment_t old_fs;
     old_fs = get_fs();
@@ -249,6 +249,33 @@ __weak void groups_sort(struct group_info *group_info)
 
 #ifndef in_compat_syscall
 #define in_compat_syscall() is_compat_task()
+#endif
+
+#ifndef __nocfi
+#define __nocfi
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
+#define ksu_get_uid_t(x) *(unsigned int *)&(x)
+#else
+#define ksu_get_uid_t(x) ((x).val)
+#endif
+
+// https://github.com/torvalds/linux/commit/294f69e662d1570703e9b56e95be37a9fd3afba5
+#ifndef __GCC4_has_attribute___fallthrough__
+#define __GCC4_has_attribute___fallthrough__ 0
+#endif
+
+#ifndef __has_attribute
+#define __has_attribute(x) __GCC4_has_attribute_##x
+#endif
+
+#if __has_attribute(__fallthrough__)
+#define fallthrough __attribute__((__fallthrough__))
+#else
+#define fallthrough                                                                                                    \
+    do {                                                                                                               \
+    } while (0) /* fallthrough */
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0) || defined(KSU_HAS_MODERN_STATIC_KEY_INTERFACE)

@@ -65,6 +65,13 @@ endif
 $(info -- KERNEL_VERSION: $(KERNEL_VERSION))
 $(info -- KERNEL_TYPE: $(KERNEL_TYPE))
 
+# SukiSU's native SELinux hide implementation starts at 5.10. Older kernels
+# use the isolated ReSukiSU-derived compatibility objects instead.
+ifeq ($(shell test $(VERSION) -lt 5 -o \( $(VERSION) -eq 5 -a $(PATCHLEVEL) -lt 10 \); echo $$?),0)
+obj-$(CONFIG_KSU) += non_gki/
+ccflags-y += -DKSU_NON_GKI
+endif
+
 ifeq ($(CONFIG_KSU_SUSFS), y)
 $(info -- $(REPO_NAME): using SUSFS_INLINE_HOOK)
 else
@@ -88,6 +95,76 @@ endif
 
 ifeq ($(shell grep -q "struct selinux_state " $(srctree)/security/selinux/include/security.h; echo $$?),0)
 ccflags-y += -DKSU_COMPAT_HAS_SELINUX_STATE
+endif
+
+ifeq ($(shell grep -q "policy_mutex" $(srctree)/security/selinux/include/security.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICY_MUTEX
+endif
+
+ifeq ($(shell grep -q "struct selinux_policy" $(srctree)/security/selinux/ss/services.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_SELINUX_POLICY_STRUCT
+endif
+
+ifeq ($(shell grep -q "struct mutex status_lock" $(srctree)/security/selinux/include/security.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SELINUX_STATUS_VAR_IN_SELINUX_STATE
+endif
+
+ifeq ($(shell grep -q "struct hashtab table" $(srctree)/security/selinux/ss/symtab.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_NON_POINTER_SYMTAB_STRUCT
+endif
+
+ifeq ($(shell grep -q "symtab_search" $(srctree)/security/selinux/ss/symtab.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_SYMTAB_SEARCH
+endif
+
+ifeq ($(shell grep -q "hashtab_key_params" $(srctree)/security/selinux/ss/hashtab.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_HASHTAB_KEY_PARAMS
+endif
+
+ifeq ($(shell grep -q "filename_trans_key" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_FILENAME_TRANS_KEY
+endif
+
+ifneq ($(shell grep -q "flex_array" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_MODERN_POLICYDB
+endif
+
+ifeq ($(shell grep -q "struct sidtab .sidtab" $(srctree)/security/selinux/ss/services.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SIDTAB_AS_REFERENCE
+endif
+
+ifeq ($(shell grep -q "hlist_head" $(srctree)/include/linux/lsm_hooks.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HLIST_FOR_SECURITY_HOOK_LIST
+endif
+
+ifeq ($(shell grep -F -q "int (*setprocattr)(const char *name, void *value, size_t size);" $(srctree)/include/linux/lsm_hooks.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SETPROCATTR_USE_NEW_PROTOTYPE
+endif
+
+ifeq ($(shell grep -F -q "char *lsm_names" $(srctree)/security/security.c; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_REQUIRE_PROVIDE_LSM_NAME
+endif
+
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE
+endif
+
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH
+endif
+
+ifneq ($(shell grep -q "type_attr_map_array" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_TYPE_ATTR_MAP_ARRAY_NOT_FOUND
+endif
+
+ifneq ($(shell grep -q "sym_name" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_SYM_NAME_NOT_FOUND
+endif
+
+# Newer SUSFS patches can provide their own SELinux hide hook. Reuse it when
+# present; otherwise the Non-GKI objects patch the SELinux function slots.
+ifeq ($(shell grep -q "ksu_selinux_hide_running" $(srctree)/security/selinux/hooks.c; echo $$?),0)
+ccflags-y += -DKSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
 endif
 
 ifeq ($(shell grep -q "strncpy_from_user_nofault" $(srctree)/include/linux/uaccess.h; echo $$?),0)
@@ -153,5 +230,8 @@ endif
 
 ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes
 ccflags-y += -Wno-declaration-after-statement -Wno-unused-function
+
+# Pass the same compatibility probes and include paths to kernel/non_gki/.
+subdir-ccflags-y += $(ccflags-y)
 
 # Keep a new line here!! Because someone may append config
