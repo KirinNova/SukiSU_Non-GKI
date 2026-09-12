@@ -90,7 +90,9 @@ jobs:
       BUILD_TARGET: ${{ inputs.build_target }}
       AUTHOR: ${{ inputs.author }}
       AB_PARTITION: ${{ inputs.ab_partition }}
-      DISABLE_LTO: ${{ inputs.disable_lto }}
+      # Keep the workflow boolean separate from the kernel Makefile's
+      # DISABLE_LTO compiler-flags variable.
+      DISABLE_LTO_REQUESTED: ${{ inputs.disable_lto }}
       INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
       KERNEL_NAME: ${{ inputs.kernel_name }}
       BUILD_TIME: ${{ inputs.build_time }}
@@ -104,6 +106,8 @@ jobs:
       CROSS_COMPILE_ARM32: arm-linux-gnueabi-
       CLANG_TRIPLE: aarch64-linux-gnu-
       OUT_DIR: out
+      CC: clang-12
+      LD: ld.lld-12
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: Checkout compatibility source
@@ -118,6 +122,32 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache clang coccinelle curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git libssl-dev libelf-dev lld make python3 rsync unzip zip
+
+      - name: Install Clang 12 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v clang-12 >/dev/null 2>&1; then
+            # Use distro packages when available (for example on Ubuntu 22.04).
+            if apt-cache show clang-12 >/dev/null 2>&1; then
+              sudo apt-get install -y clang-12 lld-12 llvm-12
+            fi
+          fi
+          # LLVM 12 is not published for Ubuntu 24.04 by apt.llvm.org. Use the
+          # upstream release artifact when the distro package is unavailable.
+          if ! command -v clang-12 >/dev/null 2>&1; then
+            llvm12_archive=/tmp/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+            curl -fL --retry 3 --retry-delay 2 \
+              https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang%2Bllvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz \
+              -o "$llvm12_archive"
+            sudo mkdir -p /opt/llvm-12
+            sudo tar -xJf "$llvm12_archive" --strip-components=1 -C /opt/llvm-12
+            sudo ln -sf /opt/llvm-12/bin/clang /usr/local/bin/clang-12
+            sudo ln -sf /opt/llvm-12/bin/ld.lld /usr/local/bin/ld.lld-12
+          fi
+          command -v clang-12
+          command -v ld.lld-12
+          clang-12 --version
 
       - name: Fetch clean kernel and patch sources
         shell: bash
@@ -159,7 +189,7 @@ jobs:
         run: |
           set -o pipefail
           cd "$KERNEL_ROOT"
-          make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC=clang \
+          make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC="$CC" LD="$LD" \
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
           image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
