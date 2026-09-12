@@ -2,6 +2,13 @@
 set -euo pipefail
 cd "${KERNEL_ROOT:?}"; out=${OUT_DIR:-out}; export ARCH=${ARCH:-arm64} SUBARCH=${SUBARCH:-$ARCH}
 export KBUILD_BUILD_USER=${AUTHOR:-XiZi} KBUILD_BUILD_HOST=GitHub-Actions KBUILD_BUILD_TIMESTAMP=${BUILD_TIME:-$(date -u '+%Y-%m-%d %H:%M:%S')}
+# Some non-GKI arm64 kernels (including 4.9 trees) validate the 32-bit
+# compat-vDSO toolchain while parsing the Makefile during configuration.
+# Keep defaults here so the script also works outside GitHub Actions, while
+# allowing callers to provide a different cross toolchain through the env.
+export CROSS_COMPILE=${CROSS_COMPILE:-aarch64-linux-gnu-}
+export CROSS_COMPILE_ARM32=${CROSS_COMPILE_ARM32:-arm-linux-gnueabi-}
+export CLANG_TRIPLE=${CLANG_TRIPLE:-aarch64-linux-gnu-}
 mkdir -p "$out"; config_targets=("${DEFCONFIG_RESOLVED:?}")
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)

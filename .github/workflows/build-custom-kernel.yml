@@ -97,6 +97,12 @@ jobs:
       KERNEL_VERSION: ${{ inputs.kernel_version }}
       INTEGRATE_DROIDSPACES: ${{ inputs.integrate_droidspaces }}
       PACKAGE_AK3: ${{ inputs.package_ak3 }}
+      # Keep the cross toolchain visible during configuration as well as the
+      # build. Older arm64 kernels require CROSS_COMPILE_ARM32 while parsing
+      # arch/arm64/Makefile, before the first image target is built.
+      CROSS_COMPILE: aarch64-linux-gnu-
+      CROSS_COMPILE_ARM32: arm-linux-gnueabi-
+      CLANG_TRIPLE: aarch64-linux-gnu-
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: Checkout compatibility source
