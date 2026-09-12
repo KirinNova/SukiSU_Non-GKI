@@ -127,15 +127,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v clang-12 >/dev/null 2>&1; then
+          have_clang12() {
+            command -v clang-12 >/dev/null 2>&1 && clang-12 --version >/dev/null 2>&1
+          }
+          if ! have_clang12; then
             # Use distro packages when available (for example on Ubuntu 22.04).
-            if apt-cache show clang-12 >/dev/null 2>&1; then
-              sudo apt-get install -y clang-12 lld-12 llvm-12
+            if apt-cache show clang-12 2>/dev/null | grep -q '^Package: clang-12$'; then
+              sudo apt-get install -y clang-12 lld-12 llvm-12 || true
             fi
           fi
           # LLVM 12 is not published for Ubuntu 24.04 by apt.llvm.org. Use the
           # upstream release artifact when the distro package is unavailable.
-          if ! command -v clang-12 >/dev/null 2>&1; then
+          if ! have_clang12; then
             llvm12_archive=/tmp/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
             curl -fL --retry 3 --retry-delay 2 \
               https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang%2Bllvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz \
