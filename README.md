@@ -56,13 +56,27 @@ curl -LSs https://raw.githubusercontent.com/xiziya/SukiSU_Non-GKI/builtin/kernel
 
 旧版 `susfs_inline_hook_patches.sh` 会搜索 `ksu_hide_setprocattr`。本移植不伪造该旧接口，因此脚本会跳过那一个 hook；SELinux hide 由 Non-GKI 运行时兼容层接管。脚本中的其他 SukiSU/SUSFS inline hooks 不受影响。
 
+### Zygisk Next 兼容性说明
+
+Zygisk Next 是用户空间模块，不由 KernelSU 内核驱动实现。上游识别依赖 `GET_INFO` 返回的 `KSU_VERSION`、UAPI 版本和功能位；本仓库保留了 SukiSU Ultra 的 UAPI 编号，并在离线/浅克隆时使用稳定的非零版本回退，避免管理器把内核误判为旧版或不支持。内核本身没有可安全添加的“Zygisk 已启用”位，因此“需要重启”提示不能通过伪造一个内核功能位解决；安装/升级 Zygisk Next 后按其模块说明重启一次是正常行为。若重启后仍显示该提示，应提供 Zygisk Next bugreport 及管理器版本，不能仅凭内核编译日志判断。
+
 ## GitHub Actions 通用构建
 
 `.github/workflows/build-custom-kernel.yml` 提供 `workflow_dispatch` 构建入口。必须填写设备 `codename` 和以 `.git` 结尾的纯净内核仓库；`kernel_branch` 默认 `bka`。`defconfig` 请输入目录下的 `*_defconfig` 路径，例如 `vendor/xiaomi/mi845_defconfig`，也可以留空让工作流按 codename 自动探测；只有唯一候选才会自动使用，多个候选会直接失败并列出候选。`device_config` 是可选的 `目录/*.config` 路径。
 
 其余输入覆盖作者、A/B 分区、LTO、SUSFS + SukiSU 兼容版、内核名（空值为 `by_XiZi`）、构建时间、内核版本、DroidSpaces 和 AnyKernel3。构建身份会写入 `KBUILD_BUILD_USER`，自定义时间写入 `KBUILD_BUILD_TIMESTAMP`，内核 localversion 延续 `build.sh` 的 `-名称-版本-日期` 规则。
 
+对于没有现代 VFS/backport 的碎片化 Non-GKI 内核，可以启用“机型专属补丁”。工作流会 clone 指定的 `.git` 仓库和分支，从其 `Patches/` 目录按空格分隔的文件名逐个应用，顺序位于 SukiSU、SUSFS 和 inline hook 之前；补丁失败会终止构建，应用数量、仓库、分支和状态会写入 build report。关闭开关时这些仓库和文件输入不会被读取。
+
 工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`；补丁产生 `.rej` 时失败并保留日志。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename 和 A/B 选择生成 `anykernel.sh`，并写入指定的刷入提示文案。
+
+可用以下命令生成只包含兼容源码的上游基线补丁，默认基于 SukiSU Ultra `builtin` 提交 `e2912817f4e1b194e582a06e0b5eacf6a3fb7083`：
+
+```sh
+bash .github/scripts/generate-upstream-compat-patch.sh
+```
+
+输出文件为 `artifacts/sukisu-ultra-builtin-non-gki-compat.patch`。更新上游基线后设置 `UPSTREAM_REF` 再生成，便于审查兼容逻辑并移植到后续版本。
 
 示范模板位于 `.github/workflows/temple/build-custom-kernel-example.yml`。GitHub 不会执行 `temple/` 子目录中的文件；需要实际运行时请使用根目录的活动工作流。
 
@@ -81,8 +95,6 @@ curl -LSs https://raw.githubusercontent.com/xiziya/SukiSU_Non-GKI/builtin/kernel
 - [@ShirkNeko](https://github.com/ShirkNeko)（SukiSU上游）
 
 > 特别感谢开源社区相关项目带来的启发。
-
-
 
 
 

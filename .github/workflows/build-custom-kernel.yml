@@ -73,6 +73,23 @@ on:
         description: Package an AnyKernel3 flashable zip
         required: true
         type: boolean
+      apply_device_patches:
+        description: Apply device-specific patches before SUSFS and inline hooks
+        required: true
+        type: boolean
+      device_patch_repo:
+        description: Complete device patch repository URL ending in .git
+        required: false
+        type: string
+      device_patch_branch:
+        description: Device patch repository branch
+        required: false
+        default: main
+        type: string
+      device_patch_names:
+        description: Space-separated patch filenames under the repository Patches directory
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -99,6 +116,10 @@ jobs:
       KERNEL_VERSION: ${{ inputs.kernel_version }}
       INTEGRATE_DROIDSPACES: ${{ inputs.integrate_droidspaces }}
       PACKAGE_AK3: ${{ inputs.package_ak3 }}
+      APPLY_DEVICE_PATCHES: ${{ inputs.apply_device_patches }}
+      DEVICE_PATCH_REPO: ${{ inputs.device_patch_repo }}
+      DEVICE_PATCH_BRANCH: ${{ inputs.device_patch_branch }}
+      DEVICE_PATCH_NAMES: ${{ inputs.device_patch_names }}
       # Keep the cross toolchain visible during configuration as well as the
       # build. Older arm64 kernels require CROSS_COMPILE_ARM32 while parsing
       # arch/arm64/Makefile, before the first image target is built.
@@ -173,6 +194,11 @@ jobs:
           cd "$KERNEL_ROOT"
           KSU_REPO="$GITHUB_WORKSPACE" KSU_BRANCH=builtin sh "$GITHUB_WORKSPACE/kernel/setup.sh"
 
+      - name: Apply device-specific patches
+        shell: bash
+        if: inputs.apply_device_patches
+        run: bash .github/scripts/apply-device-patches.sh
+
       - name: Integrate SUSFS and inline hooks
         shell: bash
         if: inputs.integrate_susfs
@@ -216,6 +242,9 @@ jobs:
           mkdir -p "$ARTIFACT_DIR/patch-diagnostics"
           if [[ -d "$KERNEL_ROOT" ]]; then
             find "$KERNEL_ROOT" -type f \( -name '*.rej' -o -name '*.orig' \) -print -exec cp --parents '{}' "$ARTIFACT_DIR/patch-diagnostics/" \; || true
+          fi
+          if [[ -d "$ARTIFACT_DIR/device-patches" ]]; then
+            cp -a "$ARTIFACT_DIR/device-patches" "$ARTIFACT_DIR/patch-diagnostics/" || true
           fi
 
       - name: Upload build artifacts
