@@ -9,7 +9,10 @@ patch_names=${DEVICE_PATCH_NAMES:?}
 patch_root=${ARTIFACT_DIR:?}/device-patches
 checkout=${RUNNER_TEMP:-/tmp}/device-patch-source
 
-rm -rf "$checkout"
+case "$checkout" in
+  "${RUNNER_TEMP:-/tmp}/device-patch-source"|/tmp/device-patch-source) rm -rf -- "$checkout" ;;
+  *) echo "[ERROR] refusing unsafe temporary checkout path: $checkout" >&2; exit 1 ;;
+esac
 git clone --depth=1 --branch "$branch" "$repo" "$checkout"
 patch_dir="$checkout/Patches"
 [[ -d "$patch_dir" ]] || { echo "[ERROR] device patch repository has no Patches directory: $patch_dir" >&2; exit 1; }
