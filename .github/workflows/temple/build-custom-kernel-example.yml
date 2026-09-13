@@ -23,5 +23,5 @@ on:
       device_patch_branch: { description: Device patch branch, required: false, default: main, type: string }
       device_patch_names: { description: Space-separated patch filenames under Patches/, required: false, type: string }
 
-# Copy the job steps from ../build-custom-kernel.yml and adjust toolchain/target
+# Copy the job steps from ../build-custom-kernel-Eng.yml and adjust toolchain/target
 # for the selected clean kernel tree before enabling this as a real workflow.
