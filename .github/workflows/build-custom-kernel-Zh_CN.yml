@@ -1,0 +1,256 @@
+name: 构建自定义 Non-GKI 内核（简体中文）
+
+on:
+  workflow_dispatch:
+    inputs:
+      codename:
+        description: 机型代码，例如 dipper
+        required: true
+        type: string
+      kernel_repo:
+        description: 纯净内核源码仓库完整地址，必须以 .git 结尾
+        required: true
+        type: string
+      kernel_branch:
+        description: 内核源码分支
+        required: false
+        default: bka
+        type: string
+      defconfig:
+        description: 以 _defconfig 结尾的路径；留空时按机型代码自动识别唯一候选
+        required: false
+        type: string
+      device_config:
+        description: 可选配置路径，必须以 .config 结尾
+        required: false
+        type: string
+      arch:
+        description: 内核架构
+        required: false
+        default: arm64
+        type: string
+      build_target:
+        description: 内核 Make 目标
+        required: false
+        default: Image.gz-dtb
+        type: string
+      author:
+        description: 自定义作者名称
+        required: true
+        default: XiZi
+        type: string
+      ab_partition:
+        description: 是否为 A/B 分区设备
+        required: true
+        type: boolean
+      disable_lto:
+        description: 是否关闭 LTO 优化
+        required: true
+        type: boolean
+      integrate_susfs:
+        description: 是否集成最新版 SUSFS 和本仓库的 SukiSU 兼容版
+        required: true
+        type: boolean
+      kernel_name:
+        description: 内核名称；留空默认为 by_XiZi
+        required: false
+        default: by_XiZi
+        type: string
+      build_time:
+        description: 构建时间（ISO-8601）；留空使用当前 UTC 时间
+        required: false
+        type: string
+      kernel_version:
+        description: 自定义内核版本后缀，例如 v1.0
+        required: false
+        default: v1.0
+        type: string
+      integrate_droidspaces:
+        description: 是否集成 DroidSpaces 内核支持和最新运行时文件
+        required: true
+        type: boolean
+      package_ak3:
+        description: 是否打包 AnyKernel3 刷机 ZIP
+        required: true
+        type: boolean
+      apply_device_patches:
+        description: 是否在 SUSFS 和 inline hook 前应用机型专属补丁
+        required: true
+        type: boolean
+      device_patch_repo:
+        description: 机型补丁仓库完整地址，必须以 .git 结尾
+        required: false
+        type: string
+      device_patch_branch:
+        description: 机型补丁仓库分支
+        required: false
+        default: main
+        type: string
+      device_patch_names:
+        description: 仓库 Patches 目录下的补丁文件名，多个文件以空格分隔
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      CODENAME: ${{ inputs.codename }}
+      KERNEL_REPO: ${{ inputs.kernel_repo }}
+      KERNEL_BRANCH: ${{ inputs.kernel_branch }}
+      DEFCONFIG: ${{ inputs.defconfig }}
+      DEVICE_CONFIG: ${{ inputs.device_config }}
+      ARCH: ${{ inputs.arch }}
+      BUILD_TARGET: ${{ inputs.build_target }}
+      AUTHOR: ${{ inputs.author }}
+      AB_PARTITION: ${{ inputs.ab_partition }}
+      # Keep the workflow boolean separate from the kernel Makefile's
+      # DISABLE_LTO compiler-flags variable.
+      DISABLE_LTO_REQUESTED: ${{ inputs.disable_lto }}
+      INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
+      KERNEL_NAME: ${{ inputs.kernel_name }}
+      BUILD_TIME: ${{ inputs.build_time }}
+      KERNEL_VERSION: ${{ inputs.kernel_version }}
+      INTEGRATE_DROIDSPACES: ${{ inputs.integrate_droidspaces }}
+      PACKAGE_AK3: ${{ inputs.package_ak3 }}
+      APPLY_DEVICE_PATCHES: ${{ inputs.apply_device_patches }}
+      DEVICE_PATCH_REPO: ${{ inputs.device_patch_repo }}
+      DEVICE_PATCH_BRANCH: ${{ inputs.device_patch_branch }}
+      DEVICE_PATCH_NAMES: ${{ inputs.device_patch_names }}
+      # Keep the cross toolchain visible during configuration as well as the
+      # build. Older arm64 kernels require CROSS_COMPILE_ARM32 while parsing
+      # arch/arm64/Makefile, before the first image target is built.
+      CROSS_COMPILE: aarch64-linux-gnu-
+      CROSS_COMPILE_ARM32: arm-linux-gnueabi-
+      CLANG_TRIPLE: aarch64-linux-gnu-
+      OUT_DIR: out
+      CC: clang-12
+      LD: ld.lld-12
+      ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+    steps:
+      - name: 检出兼容源码
+        uses: actions/checkout@v4
+
+      - name: 校验输入参数
+        shell: bash
+        run: bash .github/scripts/validate-inputs.sh
+
+      - name: 安装编译依赖
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache clang coccinelle curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git libssl-dev libelf-dev lld make python3 rsync unzip zip
+
+      - name: 安装 Clang 12 工具链
+        shell: bash
+        run: |
+          set -euo pipefail
+          have_clang12() {
+            command -v clang-12 >/dev/null 2>&1 && clang-12 --version >/dev/null 2>&1
+          }
+          if ! have_clang12; then
+            # Use distro packages when available (for example on Ubuntu 22.04).
+            if apt-cache show clang-12 2>/dev/null | grep -q '^Package: clang-12$'; then
+              sudo apt-get install -y clang-12 lld-12 llvm-12 || true
+            fi
+          fi
+          # LLVM 12 is not published for Ubuntu 24.04 by apt.llvm.org. Use the
+          # upstream release artifact when the distro package is unavailable.
+          if ! have_clang12; then
+            llvm12_archive=/tmp/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+            curl -fL --retry 3 --retry-delay 2 \
+              https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang%2Bllvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz \
+              -o "$llvm12_archive"
+            sudo mkdir -p /opt/llvm-12
+            sudo tar -xJf "$llvm12_archive" --strip-components=1 -C /opt/llvm-12
+            sudo ln -sf /opt/llvm-12/bin/clang /usr/local/bin/clang-12
+            sudo ln -sf /opt/llvm-12/bin/ld.lld /usr/local/bin/ld.lld-12
+          fi
+          command -v clang-12
+          command -v ld.lld-12
+          clang-12 --version
+
+      - name: 获取纯净内核和补丁源码
+        shell: bash
+        run: |
+          git clone --depth=1 --branch "$KERNEL_BRANCH" "$KERNEL_REPO" kernel-source
+          git clone --depth=1 --branch mainline https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git patch-source
+          echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel-source" >> "$GITHUB_ENV"
+          echo "PATCH_ROOT=$GITHUB_WORKSPACE/patch-source/Patches" >> "$GITHUB_ENV"
+          echo "BUILD_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+
+      - name: 检测内核版本和配置
+        shell: bash
+        run: bash .github/scripts/prepare-kernel.sh
+
+      - name: 集成 SukiSU Ultra 兼容版
+        if: inputs.integrate_susfs
+        shell: bash
+        run: |
+          cd "$KERNEL_ROOT"
+          KSU_REPO="$GITHUB_WORKSPACE" KSU_BRANCH=builtin sh "$GITHUB_WORKSPACE/kernel/setup.sh"
+
+      - name: 应用机型专属补丁
+        shell: bash
+        if: inputs.apply_device_patches
+        run: bash .github/scripts/apply-device-patches.sh
+
+      - name: 集成 SUSFS 和 inline hooks
+        shell: bash
+        if: inputs.integrate_susfs
+        run: bash .github/scripts/integrate-susfs.sh
+
+      - name: 集成 DroidSpaces
+        shell: bash
+        if: inputs.integrate_droidspaces
+        run: bash .github/scripts/integrate-droidspaces.sh
+
+      - name: 生成内核配置
+        shell: bash
+        run: bash .github/scripts/configure-kernel.sh
+
+      - name: 编译内核
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$KERNEL_ROOT"
+          make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC="$CC" LD="$LD" \
+            CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
+          image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
+          [[ -f "$image" ]] || { echo "[ERROR] expected output missing: $image" >&2; exit 1; }
+          cp "$image" "$ARTIFACT_DIR/"
+
+      - name: 打包 AnyKernel3
+        if: inputs.package_ak3
+        shell: bash
+        run: bash .github/scripts/package-anykernel.sh
+
+      - name: 生成构建报告
+        if: always()
+        shell: bash
+        run: bash .github/scripts/generate-build-report.sh
+
+      - name: 保存补丁诊断信息
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$ARTIFACT_DIR/patch-diagnostics"
+          if [[ -d "$KERNEL_ROOT" ]]; then
+            find "$KERNEL_ROOT" -type f \( -name '*.rej' -o -name '*.orig' \) -print -exec cp --parents '{}' "$ARTIFACT_DIR/patch-diagnostics/" \; || true
+          fi
+          if [[ -d "$ARTIFACT_DIR/device-patches" ]]; then
+            cp -a "$ARTIFACT_DIR/device-patches" "$ARTIFACT_DIR/patch-diagnostics/" || true
+          fi
+
+      - name: 上传构建产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.codename }}-sukisu-non-gki
+          path: artifacts/
+          if-no-files-found: error
