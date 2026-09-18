@@ -19,8 +19,8 @@ endif
 
 REPO_NAME   := SukiSU-Ultra
 
-KSU_VERSION      := 40922
-KSU_VERSION_FULL := v4.2.0-40922-4
+override KSU_VERSION      := 40922
+override KSU_VERSION_FULL := v4.2.0-40922-4
 
 $(info -- $(REPO_NAME) version: $(KSU_VERSION) [$(KSU_VERSION_FULL)])
 
