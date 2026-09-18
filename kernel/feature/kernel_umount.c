@@ -9,7 +9,6 @@ static int kernel_umount_feature_get(u64 *value)
 static int kernel_umount_feature_set(u64 value)
 {
     bool enable = value != 0;
-
     ksu_kernel_umount_enabled = enable;
     pr_info("kernel_umount: set to %d\n", enable);
     return 0;
