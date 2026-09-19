@@ -126,6 +126,12 @@ if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
   set_config CONFIG_USER_NS y
 fi
 if [[ "${DISABLE_LTO_REQUESTED:-false}" == true ]]; then for key in CONFIG_LTO CONFIG_LTO_CLANG CONFIG_LTO_CLANG_THIN CONFIG_LTO_CLANG_FULL CONFIG_THINLTO; do sed -i "s/^${key}=y/# ${key} is not set/" "$out/.config"; done; echo CONFIG_LTO_NONE=y >> "$out/.config"; fi
+if [[ "${IGNORE_WERROR_REQUESTED:-false}" == true ]]; then
+  # Disable the kernel-level CONFIG_CC_WERROR guard as well as appending
+  # -Wno-error during compilation. This covers both global and per-warning
+  # -Werror flags in old vendor Kbuild files without changing source code.
+  set_config CONFIG_CC_WERROR n
+fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
 sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"
 # Never append -g<commit>-dirty: all integrations intentionally change the

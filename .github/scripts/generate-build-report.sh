@@ -17,7 +17,8 @@ start=${BUILD_START_EPOCH:-$end}
   echo "- 编译总时间: $((end-start)) 秒"
   echo "- 内核工具版本检测脚本: ${MIN_TOOL_VERSION_STATUS:-not-run}"
   echo "- 上游发行后缀处理: ${VENDOR_LOCALVERSION_STATUS:-not-run}"
-  echo "- 集成选择: SukiSU Ultra=是; SUSFS=${INTEGRATE_SUSFS:-false}; DroidSpaces=${INTEGRATE_DROIDSPACES:-false}; 机型专属补丁=${APPLY_DEVICE_PATCHES:-false}; 内核版本伪装=${SPOOF_KERNEL_VERSION:-false}; LTO关闭=${DISABLE_LTO_REQUESTED:-false}; A/B=${AB_PARTITION:-false}; AK3=${PACKAGE_AK3:-false}"
+  echo "- 编译器 Werror 降级: ${IGNORE_WERROR_REQUESTED:-false}"
+  echo "- 集成选择: SukiSU Ultra=是; SUSFS=${INTEGRATE_SUSFS:-false}; DroidSpaces=${INTEGRATE_DROIDSPACES:-false}; 机型专属补丁=${APPLY_DEVICE_PATCHES:-false}; 内核版本伪装=${SPOOF_KERNEL_VERSION:-false}; LTO关闭=${DISABLE_LTO_REQUESTED:-false}; Werror降级=${IGNORE_WERROR_REQUESTED:-false}; A/B=${AB_PARTITION:-false}; AK3=${PACKAGE_AK3:-false}"
 
   if [[ "${SPOOF_KERNEL_VERSION:-false}" == true ]]; then
     echo "- 内核版本伪装目标: ${KERNEL_SPOOFED_VERSION:-${SPOOFED_KERNEL_VERSION:-unknown}}"

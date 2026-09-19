@@ -56,6 +56,11 @@ on:
         description: 是否关闭 LTO 优化
         required: true
         type: boolean
+      ignore_werror:
+        description: 是否将所有编译器 -Werror 降级为普通警告
+        required: true
+        default: false
+        type: boolean
       integrate_susfs:
         description: 是否集成最新版 SUSFS 和本仓库的 SukiSU 兼容版
         required: true
@@ -121,6 +126,7 @@ jobs:
       # Keep the workflow boolean separate from the kernel Makefile's
       # DISABLE_LTO compiler-flags variable.
       DISABLE_LTO_REQUESTED: ${{ inputs.disable_lto }}
+      IGNORE_WERROR_REQUESTED: ${{ inputs.ignore_werror }}
       INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
       KERNEL_NAME: ${{ inputs.kernel_name }}
       BUILD_TIME: ${{ inputs.build_time }}
@@ -140,11 +146,8 @@ jobs:
       OUT_DIR: out
       CC: clang-12
       LD: ld.lld-12
-      # Legacy vendor drivers in some 4.x trees trigger these diagnostics
-      # under Clang 12; keep them as warnings without changing code behavior.
-      # Legacy vendor drivers may leave feature-gated locals unused under
-      # Clang 12. Keep these diagnostics as warnings without changing source.
-      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension -Wno-error=unused-variable -Wno-error=unused-function
+      # Extra warning policy is selected by the workflow input at build time.
+      KCFLAGS: ""
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: 检出兼容源码
@@ -239,6 +242,12 @@ jobs:
         run: |
           set -o pipefail
           cd "$KERNEL_ROOT"
+          kernel_kcflags="${KCFLAGS:-}"
+          if [[ "${IGNORE_WERROR_REQUESTED:-false}" == true ]]; then
+            # Clang accepts a bare -Wno-error to downgrade every warning,
+            # including warnings emitted by legacy vendor drivers.
+            kernel_kcflags="${kernel_kcflags:+$kernel_kcflags }-Wno-error"
+          fi
           kernelrelease_args=()
           if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
             release_date=$(date -u -d "${BUILD_TIME:-now}" +%Y%m%d 2>/dev/null || date -u +%Y%m%d)
@@ -246,7 +255,7 @@ jobs:
           fi
           make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC="$CC" LD="$LD" \
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="$KCFLAGS" \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="$kernel_kcflags" \
             "${kernelrelease_args[@]}" \
             "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
           image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
