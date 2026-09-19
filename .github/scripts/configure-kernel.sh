@@ -132,6 +132,25 @@ if [[ "${IGNORE_WERROR_REQUESTED:-false}" == true ]]; then
   # -Werror flags in old vendor Kbuild files without changing source code.
   set_config CONFIG_CC_WERROR n
 fi
+# Some vendor SDM845 trees keep the TAS2557 caller enabled while leaving the
+# speaker-ID provider as an optional MFD symbol. That combination compiles all
+# objects but fails at the final vmlinux link with an undefined
+# spk_id_get_pin_3state symbol. Enable the provider only when this exact source
+# level dependency is present; unrelated kernels remain unchanged.
+spk_id_status=not-needed
+if [[ -f drivers/mfd/spk-id.c && -f drivers/mfd/Makefile && \
+      -f techpack/audio/asoc/codecs/tas2557/tas2557-core.c && \
+      -f drivers/mfd/Kconfig ]] && \
+   grep -q 'CONFIG_MFD_SPK_ID.*spk-id\.o' drivers/mfd/Makefile && \
+   grep -q 'config MFD_SPK_ID' drivers/mfd/Kconfig && \
+   grep -q 'spk_id_get_pin_3state' techpack/audio/asoc/codecs/tas2557/tas2557-core.c; then
+  set_config CONFIG_MFD_SPK_ID y
+  spk_id_status=enabled
+  echo '[+] enabled CONFIG_MFD_SPK_ID for the TAS2557 speaker-ID provider dependency'
+fi
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  printf 'VENDOR_SPK_ID_STATUS=%s\n' "$spk_id_status" >> "$GITHUB_ENV"
+fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
 sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"
 # Never append -g<commit>-dirty: all integrations intentionally change the
@@ -141,6 +160,12 @@ if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
   kernelrelease_args=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}${local}")
 fi
 make O="$out" "${kernelrelease_args[@]}" olddefconfig
+if [[ "$spk_id_status" == enabled ]]; then
+  grep -q '^CONFIG_MFD_SPK_ID=y$' "$out/.config" || {
+    echo '[ERROR] TAS2557 requires CONFIG_MFD_SPK_ID, but Kconfig did not retain it' >&2
+    exit 1
+  }
+fi
 if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
   required_configs=(
     CONFIG_KSU CONFIG_KSU_SUSFS CONFIG_KSU_SUSFS_SUS_PATH
