@@ -83,7 +83,7 @@ on:
         required: true
         type: boolean
       apply_device_patches:
-        description: 是否在 SUSFS 和 inline hook 前应用机型专属补丁
+        description: 是否启用机型补丁；普通补丁前置应用，SUSFS 修复补丁自动延后
         required: true
         type: boolean
       device_patch_repo:
@@ -205,12 +205,12 @@ jobs:
           cd "$KERNEL_ROOT"
           KSU_REPO="$GITHUB_WORKSPACE" KSU_BRANCH=builtin sh "$GITHUB_WORKSPACE/kernel/setup.sh"
 
-      - name: 应用机型专属补丁
+      - name: 分类并处理机型专属补丁
         shell: bash
         if: inputs.apply_device_patches
         run: bash .github/scripts/apply-device-patches.sh
 
-      - name: 集成 SUSFS 和 inline hooks
+      - name: 集成 SUSFS、应用机型修复并执行 inline hooks
         shell: bash
         if: inputs.integrate_susfs
         run: bash .github/scripts/integrate-susfs.sh

@@ -83,7 +83,7 @@ on:
         required: true
         type: boolean
       apply_device_patches:
-        description: Apply device-specific patches before SUSFS and inline hooks
+        description: Enable device patches; SUSFS repair patches are automatically deferred
         required: true
         type: boolean
       device_patch_repo:
@@ -205,12 +205,12 @@ jobs:
           cd "$KERNEL_ROOT"
           KSU_REPO="$GITHUB_WORKSPACE" KSU_BRANCH=builtin sh "$GITHUB_WORKSPACE/kernel/setup.sh"
 
-      - name: Apply device-specific patches
+      - name: Classify and process device-specific patches
         shell: bash
         if: inputs.apply_device_patches
         run: bash .github/scripts/apply-device-patches.sh
 
-      - name: Integrate SUSFS and inline hooks
+      - name: Integrate SUSFS, apply device repairs, and run inline hooks
         shell: bash
         if: inputs.integrate_susfs
         run: bash .github/scripts/integrate-susfs.sh

@@ -23,6 +23,8 @@ start=${BUILD_START_EPOCH:-$end}
   fi
   if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
     echo "- SUSFS 补丁状态: ${SUSFS_PATCH_STATUS:-not-run}"
+    echo "- SUSFS 与机型补丁重叠验证: ${SUSFS_DEVICE_OVERLAP_STATUS:-not-run}"
+    echo "- SUSFS 已修复拒绝文件: ${SUSFS_REPAIRED_REJECT_COUNT:-0}"
     echo "- SUSFS inline hook 状态: ${SUSFS_INLINE_HOOK_STATUS:-not-run}"
     echo "- 补丁拒绝文件: ${PATCH_REJECT_COUNT:-0}"
     echo "- 补丁原始备份文件: ${PATCH_ORIG_COUNT:-0}"
@@ -30,6 +32,9 @@ start=${BUILD_START_EPOCH:-$end}
   if [[ "${APPLY_DEVICE_PATCHES:-false}" == true ]]; then
     echo "- 机型补丁仓库: ${DEVICE_PATCH_REPO_NAME:-unknown}@${DEVICE_PATCH_BRANCH:-unknown}"
     echo "- 机型补丁数量: ${DEVICE_PATCH_COUNT:-unknown}"
+    echo "- SUSFS 前置机型补丁数量: ${DEVICE_PATCH_PRE_COUNT:-0}"
+    echo "- SUSFS 修复机型补丁数量: ${DEVICE_PATCH_REPAIR_COUNT:-0}"
+    echo "- 已执行 SUSFS 修复补丁数量: ${DEVICE_PATCH_REPAIR_APPLIED_COUNT:-0}"
     echo "- 机型补丁状态: ${DEVICE_PATCH_STATUS:-not-run}"
   fi
   if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
