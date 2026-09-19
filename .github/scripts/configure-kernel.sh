@@ -13,12 +13,14 @@ export CLANG_TRIPLE=${CLANG_TRIPLE:-aarch64-linux-gnu-}
 # defined-but-empty so scripts/setlocalversion does not append '+' for an
 # integrated (and therefore intentionally modified) source tree.
 export LOCALVERSION=
-mkdir -p "$out"; config_targets=("${DEFCONFIG_RESOLVED:?}")
+mkdir -p "$out"
+# Only the resolved defconfig is a make target. User/device and DroidSpaces
+# files are Kconfig fragments and must be merged after the base defconfig;
+# passing them to make makes older trees enter an interactive config restart.
+config_targets=("${DEFCONFIG_RESOLVED:?}")
 kernelrelease_args=()
 [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]] && kernelrelease_args+=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}")
 if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\nLOCALVERSION=\n' "$OUT_DIR" >> "$GITHUB_ENV"; fi
-[[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
-[[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
 
 # CIP kernels may ship release-channel fragments such as localversion-cip and
 # localversion-st.  They are useful to the upstream release process, but they
@@ -90,6 +92,14 @@ apply_config_fragment() {
     set_config "$key" "$value"
   done < "$fragment"
 }
+# Apply optional fragments only after the base defconfig has created a valid
+# output .config. This keeps legacy/non-GKI Kconfig flows non-interactive.
+if [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]]; then
+  device_fragment="$DEVICE_CONFIG_RESOLVED"
+  [[ -f "$device_fragment" ]] || device_fragment="arch/${ARCH:-arm64}/configs/$device_fragment"
+  [[ -f "$device_fragment" ]] || { echo "[ERROR] config fragment not found: $DEVICE_CONFIG_RESOLVED" >&2; exit 1; }
+  apply_config_fragment "$device_fragment"
+fi
 # Integration changes add Kconfig entries after the vendor defconfig has been
 # loaded. Explicitly enable the requested KernelSU/SUSFS features in the
 # generated output config so a vendor '# CONFIG_KSU is not set' cannot disable
