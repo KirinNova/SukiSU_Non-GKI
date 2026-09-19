@@ -142,7 +142,9 @@ jobs:
       LD: ld.lld-12
       # Legacy vendor drivers in some 4.x trees trigger these diagnostics
       # under Clang 12; keep them as warnings without changing code behavior.
-      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension
+      # Legacy vendor drivers may leave feature-gated locals unused under
+      # Clang 12. Keep these diagnostics as warnings without changing source.
+      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension -Wno-error=unused-variable
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: 检出兼容源码
