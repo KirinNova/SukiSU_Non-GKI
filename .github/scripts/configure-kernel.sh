@@ -52,6 +52,9 @@ if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
   droidspaces_fragment="arch/${ARCH:-arm64}/configs/droidspaces.config"
   [[ -f "$droidspaces_fragment" ]] || { echo "[ERROR] DroidSpaces config fragment is missing: $droidspaces_fragment" >&2; exit 1; }
   apply_config_fragment "$droidspaces_fragment"
+  # Official Non-GKI guidance requires user namespaces for safe procfs access
+  # inside containers. Older third-party fragments omitted this option.
+  set_config CONFIG_USER_NS y
 fi
 if [[ "${DISABLE_LTO_REQUESTED:-false}" == true ]]; then for key in CONFIG_LTO CONFIG_LTO_CLANG CONFIG_LTO_CLANG_THIN CONFIG_LTO_CLANG_FULL CONFIG_THINLTO; do sed -i "s/^${key}=y/# ${key} is not set/" "$out/.config"; done; echo CONFIG_LTO_NONE=y >> "$out/.config"; fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
@@ -82,7 +85,7 @@ if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
   droidspaces_required_configs=(
     CONFIG_NAMESPACES CONFIG_PID_NS CONFIG_UTS_NS CONFIG_IPC_NS
     CONFIG_SECCOMP CONFIG_SECCOMP_FILTER CONFIG_CGROUPS
-    CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS CONFIG_MEMCG
+    CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS CONFIG_MEMCG CONFIG_USER_NS
     CONFIG_CGROUP_SCHED CONFIG_CGROUP_FREEZER CONFIG_DEVTMPFS
     CONFIG_OVERLAY_FS CONFIG_NET_NS CONFIG_VETH CONFIG_BRIDGE
     CONFIG_NETFILTER CONFIG_NF_CONNTRACK CONFIG_IP_NF_IPTABLES
