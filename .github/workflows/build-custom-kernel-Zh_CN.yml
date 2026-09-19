@@ -140,6 +140,9 @@ jobs:
       OUT_DIR: out
       CC: clang-12
       LD: ld.lld-12
+      # Legacy vendor drivers in some 4.x trees trigger these diagnostics
+      # under Clang 12; keep them as warnings without changing code behavior.
+      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: 检出兼容源码
@@ -234,9 +237,16 @@ jobs:
         run: |
           set -o pipefail
           cd "$KERNEL_ROOT"
+          kernelrelease_args=()
+          if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
+            release_date=$(date -u -d "${BUILD_TIME:-now}" +%Y%m%d 2>/dev/null || date -u +%Y%m%d)
+            kernelrelease_args+=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-${release_date}")
+          fi
           make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC="$CC" LD="$LD" \
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="$KCFLAGS" \
+            "${kernelrelease_args[@]}" \
+            "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
           image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
           [[ -f "$image" ]] || { echo "[ERROR] expected output missing: $image" >&2; exit 1; }
           cp "$image" "$ARTIFACT_DIR/"

@@ -14,6 +14,8 @@ export CLANG_TRIPLE=${CLANG_TRIPLE:-aarch64-linux-gnu-}
 # integrated (and therefore intentionally modified) source tree.
 export LOCALVERSION=
 mkdir -p "$out"; config_targets=("${DEFCONFIG_RESOLVED:?}")
+kernelrelease_args=()
+[[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]] && kernelrelease_args+=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}")
 if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\nLOCALVERSION=\n' "$OUT_DIR" >> "$GITHUB_ENV"; fi
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
@@ -70,7 +72,7 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
 fi
 echo "[+] min-tool-version.sh: $tool_version_status"
 
-make O="$out" "${config_targets[@]}"
+make O="$out" "${kernelrelease_args[@]}" "${config_targets[@]}"
 set_config() {
   local key=$1 value=$2
   sed -i -E "/^(# )?${key}(=.*| is not set)$/d" "$out/.config"
@@ -119,7 +121,10 @@ sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%
 # Never append -g<commit>-dirty: all integrations intentionally change the
 # ephemeral clone and the workflow already supplies a deterministic suffix.
 set_config CONFIG_LOCALVERSION_AUTO n
-make O="$out" olddefconfig
+if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
+  kernelrelease_args=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}${local}")
+fi
+make O="$out" "${kernelrelease_args[@]}" olddefconfig
 if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
   required_configs=(
     CONFIG_KSU CONFIG_KSU_SUSFS CONFIG_KSU_SUSFS_SUS_PATH
@@ -158,4 +163,4 @@ if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
     }
   done
 fi
-release=$(make O="$out" -s kernelrelease); [[ ${#release} -le 64 ]] || { echo "[ERROR] kernelrelease is ${#release} characters (>64): $release" >&2; exit 1; }; echo "KERNEL_RELEASE=$release" >> "$GITHUB_ENV"
+release=$(make O="$out" "${kernelrelease_args[@]}" -s kernelrelease); [[ ${#release} -le 64 ]] || { echo "[ERROR] kernelrelease is ${#release} characters (>64): $release" >&2; exit 1; }; echo "KERNEL_RELEASE=$release" >> "$GITHUB_ENV"

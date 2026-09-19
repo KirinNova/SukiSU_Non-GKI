@@ -29,26 +29,16 @@ original_sublevel=$(read_make_version SUBLEVEL)
   exit 1
 }
 
+# Do not rewrite VERSION/PATCHLEVEL/SUBLEVEL.  Those values define
+# LINUX_VERSION_CODE and select the kernel's compile-time APIs.  Rewriting a
+# 4.19 vendor tree to 5.15, for example, makes SUSFS select APIs that the tree
+# does not actually provide.  The final KERNELRELEASE override is applied by
+# configure-kernel.sh after the explicit local version has been assembled.
 if [[ "$major.$minor" != "$original_major.$original_minor" ]]; then
-  echo "[WARNING] spoofing across kernel families ($original_major.$original_minor -> $major.$minor) can select incompatible compile-time APIs" >&2
+  echo "[INFO] cross-family release spoof requested ($original_major.$original_minor -> $major.$minor); compile-time kernel version remains unchanged" >&2
 fi
-
-sed -i -E \
-  -e "0,/^VERSION[[:space:]]*=.*$/{s//VERSION = $major/}" \
-  -e "0,/^PATCHLEVEL[[:space:]]*=.*$/{s//PATCHLEVEL = $minor/}" \
-  -e "0,/^SUBLEVEL[[:space:]]*=.*$/{s//SUBLEVEL = $sublevel/}" \
-  Makefile
-
-actual_major=$(read_make_version VERSION)
-actual_minor=$(read_make_version PATCHLEVEL)
-actual_sublevel=$(read_make_version SUBLEVEL)
-actual="$actual_major.$actual_minor.$actual_sublevel"
-[[ "$actual" == "$requested" ]] || {
-  echo "[ERROR] Makefile version verification failed: expected $requested, got $actual" >&2
-  exit 1
-}
 
 if [[ -n "${GITHUB_ENV:-}" ]]; then
-  printf 'KERNEL_VERSION_SPOOF_STATUS=applied\nKERNEL_SPOOFED_VERSION=%s\n' "$actual" >> "$GITHUB_ENV"
+  printf 'KERNEL_VERSION_SPOOF_STATUS=deferred-release-only\nKERNEL_SPOOFED_VERSION=%s\nKERNELRELEASE_OVERRIDE_BASE=%s\n' "$requested" "$requested" >> "$GITHUB_ENV"
 fi
-printf '[+] Kernel Makefile version spoofed: %s -> %s\n' "$original_major.$original_minor.$original_sublevel" "$actual"
+printf '[+] Kernel release spoof queued: %s (source compile-time version remains %s)\n' "$requested" "$original_major.$original_minor.$original_sublevel"
