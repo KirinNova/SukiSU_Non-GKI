@@ -68,7 +68,7 @@ Zygisk Next 是用户空间模块，不由 KernelSU 内核驱动实现。上游�
 
 对于没有现代 VFS/backport 的碎片化 Non-GKI 内核，可以启用“机型专属补丁”。工作流会 clone 指定的 `.git` 仓库和分支，从其 `Patches/` 目录按空格分隔的文件名逐个应用，顺序位于 SukiSU、SUSFS 和 inline hook 之前；补丁失败会终止构建，应用数量、仓库、分支和状态会写入 build report。关闭开关时这些仓库和文件输入不会被读取。
 
-工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`；补丁产生 `.rej` 时失败并保留日志。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename 和 A/B 选择生成 `anykernel.sh`，并写入指定的刷入提示文案。
+工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`。SUSFS 或 inline hook 补丁失败时，工作流会在生成报告前收集内核树中的 `.rej`、`.orig`、补丁源文件和完整应用日志，并随构建产物上传供下载排查。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename 和 A/B 选择生成 `anykernel.sh`，并写入指定的刷入提示文案。
 
 可用以下命令生成只包含兼容源码的上游基线补丁，默认基于 SukiSU Ultra `builtin` 提交 `b20dee702035af09cb2ecb5f35443bbc1747f3e6`：
 

@@ -230,22 +230,15 @@ jobs:
         shell: bash
         run: bash .github/scripts/package-anykernel.sh
 
+      - name: Preserve patch diagnostics
+        if: always()
+        shell: bash
+        run: bash .github/scripts/collect-patch-diagnostics.sh
+
       - name: Generate build report
         if: always()
         shell: bash
         run: bash .github/scripts/generate-build-report.sh
-
-      - name: Preserve patch diagnostics
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p "$ARTIFACT_DIR/patch-diagnostics"
-          if [[ -d "$KERNEL_ROOT" ]]; then
-            find "$KERNEL_ROOT" -type f \( -name '*.rej' -o -name '*.orig' \) -print -exec cp --parents '{}' "$ARTIFACT_DIR/patch-diagnostics/" \; || true
-          fi
-          if [[ -d "$ARTIFACT_DIR/device-patches" ]]; then
-            cp -a "$ARTIFACT_DIR/device-patches" "$ARTIFACT_DIR/patch-diagnostics/" || true
-          fi
 
       - name: Upload build artifacts
         if: always()
