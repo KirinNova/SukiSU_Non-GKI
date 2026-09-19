@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 [[ "${PACKAGE_AK3:-false}" == true ]] || { echo '[+] AnyKernel3 packaging disabled'; exit 0; }
-cd "${KERNEL_ROOT:?}"; out=${OUT_DIR:-out}; artifact=${ARTIFACT_DIR:?}; git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$artifact/AnyKernel3"
+cd "${KERNEL_ROOT:?}"; out=${OUT_DIR:-out}; artifact=${ARTIFACT_DIR:?}
+ak3_target=${AK3_KERNEL_TARGET:-${BUILD_TARGET:-Image.gz-dtb}}
+case "$ak3_target" in
+  Image.gz|Image.gz-dtb) ;;
+  *) echo "[ERROR] unsupported AnyKernel3 kernel target: $ak3_target" >&2; exit 1 ;;
+esac
+kernel_image="$out/arch/${ARCH:-arm64}/boot/$ak3_target"
+[[ -f "$kernel_image" ]] || { echo "[ERROR] AnyKernel3 kernel target is missing: $kernel_image" >&2; exit 1; }
+git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$artifact/AnyKernel3"
 ak="$artifact/AnyKernel3"; slot=0; [[ "${AB_PARTITION:-false}" == true ]] && slot=1
 cat > "$ak/anykernel.sh" <<EOF
 ### AnyKernel3 Ramdisk Mod Script
@@ -47,6 +55,7 @@ dump_boot;
 write_boot;
 ## end boot install
 EOF
-cp "$out/arch/${ARCH:-arm64}/boot/${BUILD_TARGET:-Image.gz-dtb}" "$ak/"
+cp "$kernel_image" "$ak/"
+if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'AK3_KERNEL_TARGET=%s\n' "$ak3_target" >> "$GITHUB_ENV"; fi
 printf '%s SukiSU+Susfs集成内核 by%s\n内核版本:%s\n' "$CODENAME" "${AUTHOR:-XiZi}" "${KERNEL_NAME:-by_XiZi}" > "$ak/README_FLASH.txt"
 (cd "$ak" && zip -qr "$artifact/${CODENAME}-SukiSU-Non-GKI-AK3.zip" .)

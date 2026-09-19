@@ -39,10 +39,13 @@ on:
         default: arm64
         type: string
       build_target:
-        description: Kernel make target
+        description: Primary build target; choose Image.gz or Image.gz-dtb
         required: false
         default: Image.gz-dtb
-        type: string
+        type: choice
+        options:
+          - Image.gz
+          - Image.gz-dtb
       author:
         description: Custom author name
         required: true
@@ -87,6 +90,14 @@ on:
         description: Package an AnyKernel3 flashable zip
         required: true
         type: boolean
+      ak3_kernel_target:
+        description: AnyKernel3 kernel target; choose Image.gz or Image.gz-dtb
+        required: true
+        default: Image.gz-dtb
+        type: choice
+        options:
+          - Image.gz
+          - Image.gz-dtb
       apply_device_patches:
         description: Enable device patches; SUSFS repair patches are automatically deferred
         required: true
@@ -133,6 +144,7 @@ jobs:
       KERNEL_VERSION: ${{ inputs.kernel_version }}
       INTEGRATE_DROIDSPACES: ${{ inputs.integrate_droidspaces }}
       PACKAGE_AK3: ${{ inputs.package_ak3 }}
+      AK3_KERNEL_TARGET: ${{ inputs.ak3_kernel_target }}
       APPLY_DEVICE_PATCHES: ${{ inputs.apply_device_patches }}
       DEVICE_PATCH_REPO: ${{ inputs.device_patch_repo }}
       DEVICE_PATCH_BRANCH: ${{ inputs.device_patch_branch }}
@@ -253,14 +265,33 @@ jobs:
             release_date=$(date -u -d "${BUILD_TIME:-now}" +%Y%m%d 2>/dev/null || date -u +%Y%m%d)
             kernelrelease_args+=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-${release_date}")
           fi
+          build_targets=("$BUILD_TARGET")
+          if [[ "${PACKAGE_AK3:-false}" == true && "${AK3_KERNEL_TARGET:-$BUILD_TARGET}" != "$BUILD_TARGET" ]]; then
+            build_targets+=("${AK3_KERNEL_TARGET}")
+          fi
           make -j"$(nproc)" O="$OUT_DIR" ARCH="$ARCH" CC="$CC" LD="$LD" \
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="$kernel_kcflags" \
             "${kernelrelease_args[@]}" \
-            "$BUILD_TARGET" 2>&1 | tee "$ARTIFACT_DIR/build.log"
-          image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
-          [[ -f "$image" ]] || { echo "[ERROR] expected output missing: $image" >&2; exit 1; }
-          cp "$image" "$ARTIFACT_DIR/"
+            "${build_targets[@]}" 2>&1 | tee "$ARTIFACT_DIR/build.log"
+          primary_image="$OUT_DIR/arch/$ARCH/boot/$BUILD_TARGET"
+          [[ -f "$primary_image" ]] || { echo "[ERROR] expected output missing: $primary_image" >&2; exit 1; }
+          captured_targets=()
+          for target in Image.gz Image.gz-dtb; do
+            image="$OUT_DIR/arch/$ARCH/boot/$target"
+            if [[ -f "$image" ]]; then
+              cp "$image" "$ARTIFACT_DIR/"
+              captured_targets+=("$target")
+            fi
+          done
+          ak3_image="$OUT_DIR/arch/$ARCH/boot/${AK3_KERNEL_TARGET:-$BUILD_TARGET}"
+          if [[ "${PACKAGE_AK3:-false}" == true && ! -f "$ak3_image" ]]; then
+            echo "[ERROR] AnyKernel3 target is not available: $ak3_image" >&2
+            exit 1
+          fi
+          if [[ -n "${GITHUB_ENV:-}" ]]; then
+            printf 'KERNEL_IMAGES_CAPTURED=%s\n' "${captured_targets[*]}" >> "$GITHUB_ENV"
+          fi
 
       - name: Package AnyKernel3
         if: inputs.package_ak3

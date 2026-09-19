@@ -11,6 +11,7 @@ on:
       kernel_repo: { description: Complete .git kernel repository URL, required: true, type: string }
       defconfig: { description: Path ending _defconfig, required: false, type: string }
       device_config: { description: Optional path ending .config, required: false, type: string }
+      build_target: { description: Primary build target (Image.gz or Image.gz-dtb), required: false, default: Image.gz-dtb, type: choice, options: [Image.gz, Image.gz-dtb] }
       author: { description: Author, required: true, default: XiZi, type: string }
       ab_partition: { description: A/B device, required: true, type: boolean }
       disable_lto: { description: Disable LTO, required: true, type: boolean }
@@ -21,6 +22,7 @@ on:
       kernel_version: { description: Kernel version suffix, required: false, default: v1.0, type: string }
       integrate_droidspaces: { description: DroidSpaces, required: true, type: boolean }
       package_ak3: { description: AnyKernel3, required: true, type: boolean }
+      ak3_kernel_target: { description: AnyKernel3 target (Image.gz or Image.gz-dtb), required: true, default: Image.gz-dtb, type: choice, options: [Image.gz, Image.gz-dtb] }
       apply_device_patches: { description: Apply pre-patches and defer SUSFS repair patches automatically, required: true, type: boolean }
       device_patch_repo: { description: Complete .git device patch repository URL, required: false, type: string }
       device_patch_branch: { description: Device patch branch, required: false, default: main, type: string }

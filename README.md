@@ -66,13 +66,13 @@ Zygisk Next 是用户空间模块，不由 KernelSU 内核驱动实现。上游�
 
 工作流最前面提供可选的内核版本伪装开关。启用后必须填写 `主版本.次版本.子版本` 三段纯数字版本号，例如 `4.9.337`；工作流会自动解析并分别写入内核根 `Makefile` 的 `VERSION`、`PATCHLEVEL` 和 `SUBLEVEL`。伪装步骤严格位于 SukiSU、机型补丁以及 SUSFS/inline hook 集成之后，因此 SUSFS 补丁仍按源码真实版本选择。跨主版本或次版本伪装可能令后续编译选择不兼容的内核 API，工作流会输出警告，通常应只调整同一内核系列的子版本号。
 
-其余输入覆盖作者、A/B 分区、LTO、SUSFS + SukiSU 兼容版、内核名（空值为 `by_XiZi`）、构建时间、内核版本、DroidSpaces 和 AnyKernel3。构建身份会写入 `KBUILD_BUILD_USER`，自定义时间写入 `KBUILD_BUILD_TIMESTAMP`，内核 localversion 延续 `build.sh` 的 `-名称-版本-日期` 规则。启用 DroidSpaces 时，工作流会额外强制写入官方 Non-GKI 要求的 `CONFIG_USER_NS=y`，避免旧版配置片段遗漏该选项。构建报告会同时记录源码真实版本、版本伪装目标和伪装执行状态。
+其余输入覆盖作者、A/B 分区、LTO、SUSFS + SukiSU 兼容版、内核名（空值为 `by_XiZi`）、构建时间、内核版本、DroidSpaces 和 AnyKernel3。主编译目标可选择 `Image.gz` 或 `Image.gz-dtb`；启用 AnyKernel3 时还可以独立选择打包目标，若目标不同于主编译目标，工作流会自动额外编译它。构建阶段会捕获存在的 `Image.gz`/`Image.gz-dtb` 并随产物上传，报告中记录捕获列表和 SHA-256 校验。构建身份会写入 `KBUILD_BUILD_USER`，自定义时间写入 `KBUILD_BUILD_TIMESTAMP`，内核 localversion 延续 `build.sh` 的 `-名称-版本-日期` 规则。启用 DroidSpaces 时，工作流会额外强制写入官方 Non-GKI 要求的 `CONFIG_USER_NS=y`，避免旧版配置片段遗漏该选项。构建报告会同时记录源码真实版本、版本伪装目标和伪装执行状态。
 
 对于没有现代 VFS/backport 的碎片化 Non-GKI 内核，可以启用“机型专属补丁”。工作流会 clone 指定的 `.git` 仓库和分支，从其 `Patches/` 目录按空格分隔的文件名逐个分类。普通兼容补丁在通用 SUSFS 之前应用；新增行中包含 `CONFIG_KSU_SUSFS` 或 `susfs_` 的 SUSFS 修复补丁会自动暂存，在通用补丁出现冲突后再应用。关闭开关时这些仓库和文件输入不会被读取。
 
 机型补丁可以直接包含针对该内核手工完成的 SUSFS 冲突修复。通用补丁会先应用所有兼容 hunk；出现 rejected hunk 时，工作流先检查补丁是否只是被提前完整应用。如果不是，则要求暂存的修复补丁覆盖每一个产生 `.rej` 的源码文件，再依次应用修复补丁。全部成功后状态记录为 `applied-with-device-repair`，原始 `.rej`/`.orig` 会保存到诊断目录后从源码树清理，再继续 inline hook。缺少文件覆盖或修复补丁自身失败时仍会立即终止，不会静默忽略真正缺失的 SUSFS 代码。报告会分别列出前置补丁、暂存修复补丁、实际执行修复补丁和已修复拒绝文件数量。
 
-工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`。SUSFS 或 inline hook 补丁失败时，工作流会在生成报告前收集内核树中的 `.rej`、`.orig`、补丁源文件、完整应用日志和机型补丁重叠验证日志，并随构建产物上传供下载排查。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename 和 A/B 选择生成 `anykernel.sh`，并写入指定的刷入提示文案。
+工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`。SUSFS 或 inline hook 补丁失败时，工作流会在生成报告前收集内核树中的 `.rej`、`.orig`、补丁源文件、完整应用日志和机型补丁重叠验证日志，并随构建产物上传供下载排查。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename、A/B 和所选 `Image.gz`/`Image.gz-dtb` 目标生成 `anykernel.sh`，并写入指定的刷入提示文案。
 
 可用以下命令生成只包含兼容源码的上游基线补丁，默认基于 SukiSU Ultra `builtin` 提交 `b20dee702035af09cb2ecb5f35443bbc1747f3e6`：
 
