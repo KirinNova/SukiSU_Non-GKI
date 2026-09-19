@@ -1,2 +1,3 @@
 00f4796c2749752f80f1f4532778345a1cc0e766a89ad2e81f50b911418a38fd  0001-kernel-add-Non-GKI-SELinux-hide-compatibility.patch
 ffafbfdb5540f934b7dca9f5b33f8ed089f3c1074f6db849c6f90c48e19d9a4c  SukiSU_Non-GKI-builtin-623c42ec-source.zip
+73f5abe436b019e00864616a421299f697389f13432b2f20e907ecf70db9dbc5  sukisu-ultra-builtin-non-gki-compat.patch
