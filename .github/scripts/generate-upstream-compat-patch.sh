@@ -4,7 +4,7 @@ set -euo pipefail
 # Generate a portable kernel-only diff against the upstream SukiSU Ultra
 # builtin baseline. Keep this separate from workflow patching so future
 # upstream updates can be reviewed and rebased without losing compatibility.
-upstream_ref=${UPSTREAM_REF:-e2912817f4e1b194e582a06e0b5eacf6a3fb7083}
+upstream_ref=${UPSTREAM_REF:-b20dee702035af09cb2ecb5f35443bbc1747f3e6}
 output=${UPSTREAM_PATCH_OUTPUT:-artifacts/sukisu-ultra-builtin-non-gki-compat.patch}
 mkdir -p "$(dirname "$output")"
 git rev-parse --verify "$upstream_ref^{commit}" >/dev/null 2>&1 || {

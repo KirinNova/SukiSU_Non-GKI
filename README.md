@@ -6,7 +6,7 @@
 
 ## 基线
 
-- SukiSU Ultra `builtin`: `e2912817f4e1b194e582a06e0b5eacf6a3fb7083`
+- SukiSU Ultra `builtin`: `b20dee702035af09cb2ecb5f35443bbc1747f3e6`
 - ReSukiSU `main`: `fa1da13f890a19335d3f8f5c62bb5bde466fc384`
 - 验证内核: Evolution-X-Devices `kernel_xiaomi_sdm845` `bka`
 - 验证内核提交: `b0fb2a6d2d20c1f3219183e8590fff50a3a39fd6` (`4.9.337`)
@@ -70,7 +70,7 @@ Zygisk Next 是用户空间模块，不由 KernelSU 内核驱动实现。上游�
 
 工作流会严格读取内核根 `Makefile` 的 `VERSION`/`PATCHLEVEL`，选择 `susfs_patch_to_<版本>.patch`；补丁产生 `.rej` 时失败并保留日志。启用 DroidSpaces 会从官方最新 release 下载 APK/runtime，并在 SUSFS 同时启用时显示官方兼容性警告。启用 AnyKernel3 后会按 codename 和 A/B 选择生成 `anykernel.sh`，并写入指定的刷入提示文案。
 
-可用以下命令生成只包含兼容源码的上游基线补丁，默认基于 SukiSU Ultra `builtin` 提交 `e2912817f4e1b194e582a06e0b5eacf6a3fb7083`：
+可用以下命令生成只包含兼容源码的上游基线补丁，默认基于 SukiSU Ultra `builtin` 提交 `b20dee702035af09cb2ecb5f35443bbc1747f3e6`：
 
 ```sh
 bash .github/scripts/generate-upstream-compat-patch.sh
@@ -95,5 +95,4 @@ bash .github/scripts/generate-upstream-compat-patch.sh
 - [@ShirkNeko](https://github.com/ShirkNeko)（SukiSU上游）
 
 > 特别感谢开源社区相关项目带来的启发。
-
 
