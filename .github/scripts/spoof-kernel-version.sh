@@ -33,7 +33,11 @@ if [[ "$major.$minor" != "$original_major.$original_minor" ]]; then
   echo "[WARNING] spoofing across kernel families ($original_major.$original_minor -> $major.$minor) can select incompatible compile-time APIs" >&2
 fi
 
-sed -i -E   -e "0,/^VERSION[[:space:]]*=/{s//VERSION = $major/}"   -e "0,/^PATCHLEVEL[[:space:]]*=/{s//PATCHLEVEL = $minor/}"   -e "0,/^SUBLEVEL[[:space:]]*=/{s//SUBLEVEL = $sublevel/}"   Makefile
+sed -i -E \
+  -e "0,/^VERSION[[:space:]]*=.*$/{s//VERSION = $major/}" \
+  -e "0,/^PATCHLEVEL[[:space:]]*=.*$/{s//PATCHLEVEL = $minor/}" \
+  -e "0,/^SUBLEVEL[[:space:]]*=.*$/{s//SUBLEVEL = $sublevel/}" \
+  Makefile
 
 actual_major=$(read_make_version VERSION)
 actual_minor=$(read_make_version PATCHLEVEL)

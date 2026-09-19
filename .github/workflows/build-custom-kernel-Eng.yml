@@ -3,6 +3,15 @@ name: Build custom Non-GKI kernel
 on:
   workflow_dispatch:
     inputs:
+      spoof_kernel_version:
+        description: Spoof the kernel Makefile version after SukiSU and SUSFS integration
+        required: true
+        default: false
+        type: boolean
+      spoofed_kernel_version:
+        description: Spoofed kernel version in major.minor.sublevel format, for example 4.9.337
+        required: false
+        type: string
       codename:
         description: Device codename, for example dipper
         required: true
@@ -98,6 +107,8 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     env:
+      SPOOF_KERNEL_VERSION: ${{ inputs.spoof_kernel_version }}
+      SPOOFED_KERNEL_VERSION: ${{ inputs.spoofed_kernel_version }}
       CODENAME: ${{ inputs.codename }}
       KERNEL_REPO: ${{ inputs.kernel_repo }}
       KERNEL_BRANCH: ${{ inputs.kernel_branch }}
@@ -203,6 +214,11 @@ jobs:
         shell: bash
         if: inputs.integrate_susfs
         run: bash .github/scripts/integrate-susfs.sh
+
+      - name: Spoof kernel version
+        shell: bash
+        if: inputs.spoof_kernel_version
+        run: bash .github/scripts/spoof-kernel-version.sh
 
       - name: Integrate DroidSpaces
         shell: bash

@@ -64,7 +64,9 @@ Zygisk Next 是用户空间模块，不由 KernelSU 内核驱动实现。上游�
 
 `.github/workflows/build-custom-kernel-Zh_CN.yml` 提供简体中文 `workflow_dispatch` 构建入口，`.github/workflows/build-custom-kernel-Eng.yml` 提供英文入口。两者使用完全相同的构建逻辑和输入参数，仅界面显示语言不同。必须填写设备 `codename` 和以 `.git` 结尾的纯净内核仓库；`kernel_branch` 默认 `bka`。`defconfig` 请输入目录下的 `*_defconfig` 路径，例如 `vendor/xiaomi/mi845_defconfig`，也可以留空让工作流按 codename 自动探测；只有唯一候选才会自动使用，多个候选会直接失败并列出候选。`device_config` 是可选的 `目录/*.config` 路径。
 
-其余输入覆盖作者、A/B 分区、LTO、SUSFS + SukiSU 兼容版、内核名（空值为 `by_XiZi`）、构建时间、内核版本、DroidSpaces 和 AnyKernel3。构建身份会写入 `KBUILD_BUILD_USER`，自定义时间写入 `KBUILD_BUILD_TIMESTAMP`，内核 localversion 延续 `build.sh` 的 `-名称-版本-日期` 规则。启用 DroidSpaces 时，工作流会额外强制写入官方 Non-GKI 要求的 `CONFIG_USER_NS=y`，避免旧版配置片段遗漏该选项。
+工作流最前面提供可选的内核版本伪装开关。启用后必须填写 `主版本.次版本.子版本` 三段纯数字版本号，例如 `4.9.337`；工作流会自动解析并分别写入内核根 `Makefile` 的 `VERSION`、`PATCHLEVEL` 和 `SUBLEVEL`。伪装步骤严格位于 SukiSU、机型补丁以及 SUSFS/inline hook 集成之后，因此 SUSFS 补丁仍按源码真实版本选择。跨主版本或次版本伪装可能令后续编译选择不兼容的内核 API，工作流会输出警告，通常应只调整同一内核系列的子版本号。
+
+其余输入覆盖作者、A/B 分区、LTO、SUSFS + SukiSU 兼容版、内核名（空值为 `by_XiZi`）、构建时间、内核版本、DroidSpaces 和 AnyKernel3。构建身份会写入 `KBUILD_BUILD_USER`，自定义时间写入 `KBUILD_BUILD_TIMESTAMP`，内核 localversion 延续 `build.sh` 的 `-名称-版本-日期` 规则。启用 DroidSpaces 时，工作流会额外强制写入官方 Non-GKI 要求的 `CONFIG_USER_NS=y`，避免旧版配置片段遗漏该选项。构建报告会同时记录源码真实版本、版本伪装目标和伪装执行状态。
 
 对于没有现代 VFS/backport 的碎片化 Non-GKI 内核，可以启用“机型专属补丁”。工作流会 clone 指定的 `.git` 仓库和分支，从其 `Patches/` 目录按空格分隔的文件名逐个应用，顺序位于 SukiSU、SUSFS 和 inline hook 之前；补丁失败会终止构建，应用数量、仓库、分支和状态会写入 build report。关闭开关时这些仓库和文件输入不会被读取。
 

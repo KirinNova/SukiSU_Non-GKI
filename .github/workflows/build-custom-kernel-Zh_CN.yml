@@ -3,6 +3,15 @@ name: 构建自定义 Non-GKI 内核（简体中文）
 on:
   workflow_dispatch:
     inputs:
+      spoof_kernel_version:
+        description: 是否在 SukiSU 和 SUSFS 集成完成后伪装内核版本
+        required: true
+        default: false
+        type: boolean
+      spoofed_kernel_version:
+        description: 伪装版本号，必须为 主版本.次版本.子版本 格式，例如 4.9.337
+        required: false
+        type: string
       codename:
         description: 机型代码，例如 dipper
         required: true
@@ -98,6 +107,8 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     env:
+      SPOOF_KERNEL_VERSION: ${{ inputs.spoof_kernel_version }}
+      SPOOFED_KERNEL_VERSION: ${{ inputs.spoofed_kernel_version }}
       CODENAME: ${{ inputs.codename }}
       KERNEL_REPO: ${{ inputs.kernel_repo }}
       KERNEL_BRANCH: ${{ inputs.kernel_branch }}
@@ -203,6 +214,11 @@ jobs:
         shell: bash
         if: inputs.integrate_susfs
         run: bash .github/scripts/integrate-susfs.sh
+
+      - name: 伪装内核版本
+        shell: bash
+        if: inputs.spoof_kernel_version
+        run: bash .github/scripts/spoof-kernel-version.sh
 
       - name: 集成 DroidSpaces
         shell: bash

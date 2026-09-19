@@ -5,6 +5,8 @@ name: Example custom Non-GKI kernel workflow
 on:
   workflow_dispatch:
     inputs:
+      spoof_kernel_version: { description: Spoof kernel version after SukiSU/SUSFS integration, required: true, default: false, type: boolean }
+      spoofed_kernel_version: { description: Version in major.minor.sublevel format, required: false, type: string }
       codename: { description: Device codename, required: true, type: string }
       kernel_repo: { description: Complete .git kernel repository URL, required: true, type: string }
       defconfig: { description: Path ending _defconfig, required: false, type: string }
