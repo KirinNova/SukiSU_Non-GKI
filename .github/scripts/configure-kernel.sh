@@ -9,10 +9,31 @@ export KBUILD_BUILD_USER=${AUTHOR:-XiZi} KBUILD_BUILD_HOST=GitHub-Actions KBUILD
 export CROSS_COMPILE=${CROSS_COMPILE:-aarch64-linux-gnu-}
 export CROSS_COMPILE_ARM32=${CROSS_COMPILE_ARM32:-arm-linux-gnueabi-}
 export CLANG_TRIPLE=${CLANG_TRIPLE:-aarch64-linux-gnu-}
+# The workflow produces an explicitly named release.  Mark LOCALVERSION as
+# defined-but-empty so scripts/setlocalversion does not append '+' for an
+# integrated (and therefore intentionally modified) source tree.
+export LOCALVERSION=
 mkdir -p "$out"; config_targets=("${DEFCONFIG_RESOLVED:?}")
-if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\n' "$OUT_DIR" >> "$GITHUB_ENV"; fi
+if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\nLOCALVERSION=\n' "$OUT_DIR" >> "$GITHUB_ENV"; fi
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
+
+# CIP kernels may ship release-channel fragments such as localversion-cip and
+# localversion-st.  They are useful to the upstream release process, but they
+# duplicate the workflow's explicit CONFIG_LOCALVERSION and can push UTS_RELEASE
+# beyond its hard 64-byte limit.  Preserve the files under names that are not
+# consumed by scripts/setlocalversion instead of deleting them.
+vendor_localversion_status=not-present
+for localversion_file in "$KERNEL_ROOT"/localversion-cip* "$KERNEL_ROOT"/localversion-st*; do
+  [[ -f "$localversion_file" ]] || continue
+  localversion_name=$(basename "$localversion_file")
+  mv "$localversion_file" "$KERNEL_ROOT/.sukisu-disabled-$localversion_name"
+  vendor_localversion_status=suppressed
+  echo "[+] suppressed vendor release fragment: $localversion_name"
+done
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  printf 'VENDOR_LOCALVERSION_STATUS=%s\n' "$vendor_localversion_status" >> "$GITHUB_ENV"
+fi
 
 # A few vendor/non-GKI trees carry scripts/as-version.sh without the helper
 # introduced alongside it.  Kconfig invokes as-version.sh while loading the
@@ -94,7 +115,11 @@ if [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]]; then
 fi
 if [[ "${DISABLE_LTO_REQUESTED:-false}" == true ]]; then for key in CONFIG_LTO CONFIG_LTO_CLANG CONFIG_LTO_CLANG_THIN CONFIG_LTO_CLANG_FULL CONFIG_THINLTO; do sed -i "s/^${key}=y/# ${key} is not set/" "$out/.config"; done; echo CONFIG_LTO_NONE=y >> "$out/.config"; fi
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
-sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"; make O="$out" olddefconfig
+sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"
+# Never append -g<commit>-dirty: all integrations intentionally change the
+# ephemeral clone and the workflow already supplies a deterministic suffix.
+set_config CONFIG_LOCALVERSION_AUTO n
+make O="$out" olddefconfig
 if [[ "${INTEGRATE_SUSFS:-false}" == true ]]; then
   required_configs=(
     CONFIG_KSU CONFIG_KSU_SUSFS CONFIG_KSU_SUSFS_SUS_PATH
