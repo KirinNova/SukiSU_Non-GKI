@@ -15,6 +15,7 @@ start=${BUILD_START_EPOCH:-$end}
   echo "- 源码真实版本: ${KERNEL_VERSION_CODE:-unknown}"
   echo "- 纯净内核源码仓库名字: ${KERNEL_SOURCE_NAME:-unknown}"
   echo "- 编译总时间: $((end-start)) 秒"
+  echo "- 内核工具版本检测脚本: ${MIN_TOOL_VERSION_STATUS:-not-run}"
   echo "- 集成选择: SukiSU Ultra=是; SUSFS=${INTEGRATE_SUSFS:-false}; DroidSpaces=${INTEGRATE_DROIDSPACES:-false}; 机型专属补丁=${APPLY_DEVICE_PATCHES:-false}; 内核版本伪装=${SPOOF_KERNEL_VERSION:-false}; LTO关闭=${DISABLE_LTO_REQUESTED:-false}; A/B=${AB_PARTITION:-false}; AK3=${PACKAGE_AK3:-false}"
 
   if [[ "${SPOOF_KERNEL_VERSION:-false}" == true ]]; then

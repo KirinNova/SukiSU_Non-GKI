@@ -13,6 +13,42 @@ mkdir -p "$out"; config_targets=("${DEFCONFIG_RESOLVED:?}")
 if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'OUT_DIR=%s\n' "$OUT_DIR" >> "$GITHUB_ENV"; fi
 [[ -n "${DEVICE_CONFIG_RESOLVED:-}" ]] && config_targets+=("$DEVICE_CONFIG_RESOLVED")
 [[ "${INTEGRATE_DROIDSPACES:-false}" == true ]] && config_targets+=(droidspaces.config)
+
+# A few vendor/non-GKI trees carry scripts/as-version.sh without the helper
+# introduced alongside it.  Kconfig invokes as-version.sh while loading the
+# defconfig, so a missing helper is reported misleadingly as an unsupported
+# assembler.  Restore only the missing helper; never replace a kernel-provided
+# version policy.
+tool_version_helper="$KERNEL_ROOT/scripts/min-tool-version.sh"
+if [[ -f "$tool_version_helper" ]]; then
+  chmod +x "$tool_version_helper"
+  tool_version_status=present
+else
+  mkdir -p "$(dirname "$tool_version_helper")"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    '# Compatibility helper for vendor/non-GKI trees missing min-tool-version.sh.' \
+    'set -e' \
+    'if [ "$#" -ne 1 ]; then' \
+    '  echo "Usage: $0 toolname" >&2' \
+    '  exit 1' \
+    'fi' \
+    'case "$1" in' \
+    'binutils) echo 2.23.0 ;;' \
+    'gcc) echo 5.1.0 ;;' \
+    'icc) echo 16.0.3 ;;' \
+    'llvm|clang) echo 10.0.1 ;;' \
+    '*) echo "$1: unknown tool" >&2; exit 1 ;;' \
+    'esac' > "$tool_version_helper"
+  chmod +x "$tool_version_helper"
+  tool_version_status=restored
+  echo "[WARN] restored missing scripts/min-tool-version.sh for this legacy kernel tree"
+fi
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  printf 'MIN_TOOL_VERSION_STATUS=%s\n' "$tool_version_status" >> "$GITHUB_ENV"
+fi
+echo "[+] min-tool-version.sh: $tool_version_status"
+
 make O="$out" "${config_targets[@]}"
 set_config() {
   local key=$1 value=$2
