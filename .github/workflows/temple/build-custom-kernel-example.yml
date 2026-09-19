@@ -13,7 +13,7 @@ on:
       device_config: { description: Optional path ending .config, required: false, type: string }
       build_target: { description: Primary build target (Image.gz or Image.gz-dtb), required: false, default: Image.gz-dtb, type: choice, options: [Image.gz, Image.gz-dtb] }
       author: { description: Author, required: true, default: XiZi, type: string }
-      ab_partition: { description: A/B device, required: true, type: boolean }
+      ab_partition: { description: A/B device (reporting only; AK3 detects the active slot at install time), required: true, type: boolean }
       disable_lto: { description: Disable LTO, required: true, type: boolean }
       ignore_werror: { description: Downgrade all compiler -Werror diagnostics to warnings, required: true, default: false, type: boolean }
       integrate_susfs: { description: SUSFS and SukiSU, required: true, type: boolean }

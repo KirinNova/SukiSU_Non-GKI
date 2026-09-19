@@ -52,7 +52,7 @@ on:
         default: XiZi
         type: string
       ab_partition:
-        description: 是否为 A/B 分区设备
+        description: 是否为 A/B 分区设备（仅用于报告；AK3 刷入时自动识别实际槽位）
         required: true
         type: boolean
       disable_lto:

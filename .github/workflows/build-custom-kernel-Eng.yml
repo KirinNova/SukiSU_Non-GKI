@@ -52,7 +52,7 @@ on:
         default: XiZi
         type: string
       ab_partition:
-        description: Is this an A/B slot device?
+        description: Is this an A/B slot device? (reporting only; AK3 detects the active slot at install time)
         required: true
         type: boolean
       disable_lto:
