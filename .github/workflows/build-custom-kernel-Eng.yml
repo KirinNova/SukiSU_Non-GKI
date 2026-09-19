@@ -144,7 +144,7 @@ jobs:
       # under Clang 12; keep them as warnings without changing code behavior.
       # Legacy vendor drivers may leave feature-gated locals unused under
       # Clang 12. Keep these diagnostics as warnings without changing source.
-      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension -Wno-error=unused-variable
+      KCFLAGS: -Wno-error=shift-overflow -Wno-error=vla-extension -Wno-error=unused-variable -Wno-error=unused-function
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
     steps:
       - name: Checkout compatibility source
