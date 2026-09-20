@@ -35,6 +35,7 @@ start=${BUILD_START_EPOCH:-$end}
     echo "- SUSFS 与机型补丁重叠验证: ${SUSFS_DEVICE_OVERLAP_STATUS:-not-run}"
     echo "- SUSFS 已修复拒绝文件: ${SUSFS_REPAIRED_REJECT_COUNT:-0}"
     echo "- SUSFS inline hook 状态: ${SUSFS_INLINE_HOOK_STATUS:-not-run}"
+    echo "- SUSFS hook 兼容处理: ${SUSFS_HOOK_COMPAT_STATUS:-not-run}"
     echo "- 补丁拒绝文件: ${PATCH_REJECT_COUNT:-0}"
     echo "- 补丁原始备份文件: ${PATCH_ORIG_COUNT:-0}"
   fi

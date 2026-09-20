@@ -144,14 +144,52 @@ else
   set_github_env SUSFS_PATCH_STATUS applied
 fi
 
+hook_script="$patch_root/susfs_inline_hook_patches.sh"
+[[ -f "$hook_script" ]] || {
+  set_github_env SUSFS_INLINE_HOOK_STATUS missing
+  echo "[ERROR] SUSFS inline hook script is missing: $hook_script" >&2
+  exit 1
+}
+
+# Upstream briefly changed the stat hook declaration anchor to the literal
+# "lookup_flags = 0". Vendor 4.19 trees commonly initialize it with LOOKUP_*
+# flags, so the hook body was inserted without its local fname declaration.
+# Broaden only that exact upstream anchor when the target has a compatible
+# declaration with a different initializer.
+hook_compat_status=not-needed
+if [[ -f fs/stat.c ]] &&
+   grep -Fq "sed -i '/unsigned int lookup_flags = 0;/a" "$hook_script" &&
+   ! grep -Fq 'unsigned int lookup_flags = 0;' fs/stat.c &&
+   grep -Eq '^[[:space:]]*unsigned int lookup_flags[[:space:]]*=' fs/stat.c; then
+  sed -i 's|/unsigned int lookup_flags = 0;/a|/unsigned int lookup_flags =/a|g' "$hook_script"
+  hook_compat_status=normalized-stat-anchor
+  echo '[+] normalized SUSFS stat hook anchor for vendor lookup_flags initialization'
+fi
+set_github_env SUSFS_HOOK_COMPAT_STATUS "$hook_compat_status"
+
 set +e
-bash "$patch_root/susfs_inline_hook_patches.sh" 2>&1 | tee "$diagnostics/susfs-inline-hooks.log"
+bash "$hook_script" 2>&1 | tee "$diagnostics/susfs-inline-hooks.log"
 hook_status=${PIPESTATUS[0]}
 set -e
 if (( hook_status != 0 )); then
   set_github_env SUSFS_INLINE_HOOK_STATUS failed
   echo '[ERROR] SUSFS inline hook patching failed; diagnostics will be uploaded as build artifacts' >&2
   exit "$hook_status"
+fi
+
+# Do not trust the helper's count-only success message. A body without the
+# declaration is syntactically invalid but otherwise looks "patched" to it.
+if [[ -f fs/stat.c ]] && grep -q 'fname = getname_flags' fs/stat.c; then
+  fname_decl_line=$(grep -n -m1 'struct filename \*fname = NULL;' fs/stat.c | cut -d: -f1 || true)
+  fname_use_line=$(grep -n -m1 'fname = getname_flags' fs/stat.c | cut -d: -f1 || true)
+  if [[ -z "$fname_decl_line" || -z "$fname_use_line" || "$fname_decl_line" -ge "$fname_use_line" ]]; then
+    set_github_env SUSFS_INLINE_HOOK_STATUS invalid-stat-hook
+    {
+      echo '[ERROR] SUSFS stat hook uses fname without an in-scope declaration'
+      echo "declaration line: ${fname_decl_line:-missing}; first use line: ${fname_use_line:-missing}"
+    } | tee -a "$diagnostics/susfs-inline-hooks.log" >&2
+    exit 1
+  fi
 fi
 set_github_env SUSFS_INLINE_HOOK_STATUS applied
 echo '[+] SUSFS and inline hooks applied'

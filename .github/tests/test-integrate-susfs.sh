@@ -85,4 +85,27 @@ grep -qx 'SUSFS_DEVICE_OVERLAP_STATUS=unresolved' "$unresolved/github.env"
 find "$unresolved/kernel" -type f -name '*.rej' | grep -q .
 [[ ! -f "$unresolved/kernel/hook-ran" ]]
 
+stat_compat=$(make_fixture stat-compat)
+mkdir -p "$stat_compat/kernel/fs"
+printf '%s\n' \
+  'int vfs_statx(int dfd, const char *filename, int flags)' \
+  '{' \
+  '  int error;' \
+  '  unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;' \
+  '  error = user_path_at(dfd, filename, lookup_flags, &path);' \
+  '  return error;' \
+  '}' \
+  > "$stat_compat/kernel/fs/stat.c"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'set -euo pipefail' \
+  "sed -i '/unsigned int lookup_flags = 0;/a\\  struct filename *fname = NULL;' fs/stat.c" \
+  "sed -i '/error = user_path_at/i\\  fname = getname_flags(filename, lookup_flags, NULL);' fs/stat.c" \
+  > "$stat_compat/patches/susfs_inline_hook_patches.sh"
+chmod +x "$stat_compat/patches/susfs_inline_hook_patches.sh"
+run_integration "$stat_compat" false
+grep -q 'struct filename \*fname = NULL;' "$stat_compat/kernel/fs/stat.c"
+grep -qx 'SUSFS_HOOK_COMPAT_STATUS=normalized-stat-anchor' "$stat_compat/github.env"
+grep -qx 'SUSFS_INLINE_HOOK_STATUS=applied' "$stat_compat/github.env"
+
 echo '[+] integrate-susfs tests passed'
