@@ -145,25 +145,25 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
     int ret;
 
     if (unlikely(!filename_ptr))
-        return 0;
+        return 1;
 
     filename = *filename_ptr;
     if (IS_ERR(filename))
-        return 0;
+        return 1;
 
     if (!ksu_handle_execveat_init(filename, (struct user_arg_ptr*)argv_user, (struct user_arg_ptr*)envp_user))
-        return 0;
+        return 1;
 
     if (!(__ksu_is_allow_uid_for_current(current_uid().val)))
-        return 0;
+        return 1;
 
     if (likely(memcmp(filename->name, su_path, sizeof(su_path))))
-        return 0;
+        return 1;
 
     if (current_chrooted())
     {
         pr_err("ksu_handle_execveat_sucompat: su found but NOT allowed! Because current process is running in chrooted environment\n");
-        return 0;
+        return 1;
     }
 
     pr_info("ksu_handle_execveat_sucompat: su found\n");
@@ -186,17 +186,27 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
     return 0;
 }
 
-// Legacy SUSFS inline hook scripts call a post handler that current SukiSU
-// no longer needs because the pre handler emits its pending event directly.
+// Legacy SUSFS inline hooks invoke this after do_execveat_common(). Installing
+// the scoped fd only after a successful exec prevents capability leakage when
+// exec fails and lets the new ksud use wrappers under custom SELinux profiles.
 int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv_user, void *envp_user,
                                       int *flags, int *retval)
 {
+    int su_fd;
+
     (void)fd;
     (void)filename_ptr;
     (void)argv_user;
     (void)envp_user;
     (void)flags;
-    (void)retval;
+
+    if (!retval || *retval)
+        return 0;
+
+    su_fd = ksu_install_su_fd();
+    if (su_fd < 0)
+        pr_warn("install su session fd failed: %d\n", su_fd);
+
     return 0;
 }
 

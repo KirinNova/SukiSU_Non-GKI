@@ -11,6 +11,8 @@ git rev-parse --verify "$upstream_ref^{commit}" >/dev/null 2>&1 || {
   echo "[ERROR] upstream baseline is not present locally: $upstream_ref" >&2
   exit 1
 }
+UPSTREAM_MANAGER_REF=${UPSTREAM_MANAGER_REF:-upstream/main} \
+  bash .github/scripts/check-manager-uapi-sync.sh
 git diff --binary "$upstream_ref"..HEAD -- kernel > "$output"
 [[ -s "$output" ]] || { echo '[ERROR] generated compatibility patch is empty' >&2; exit 1; }
 echo "[+] Generated $output against SukiSU Ultra builtin $upstream_ref"

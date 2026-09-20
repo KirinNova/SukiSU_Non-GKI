@@ -20,6 +20,7 @@
 - 如果 SUSFS 已提供新版 SELinux hide hook，则直接复用；否则使用 ReSukiSU 风格的运行时 function/LSM slot patch。
 - `kernel/Makefile` 保留官方 builtin 的版本/UAPI 契约；GitHub API 或 `main` 引用不可用时使用本地提交计数或 `VERSION_BASE`，避免错误回退到管理器拒绝的 `KSU_VERSION=13000`。
 - 兼容旧版 Manager 的 app-profile v2/v3 ioctl：按用户空间版本读写 776 字节前缀，并迁移到当前 v4 profile。
+- 对齐最新版 Manager 的 UAPI 4：完整移植 UAPI 3 的受限 SU 会话 FD，并声明 UAPI 4 的 bundled-LKM 能力位；SUSFS 手动 exec hook 只在 `su -> ksud` 成功后安装会话 FD，避免失败路径泄漏权限。
 - `post-fs-data` 在 observer 注册后增加一次性 manager UID 扫描，覆盖 `packages.list` 已存在的旧版 Android 启动时序。
 - Non-GKI 的每条 SELinux policy 更新路径都会刷新 SUSFS SID 缓存；原补丁的 `kernel/selinux/rules.c` hunk 不会覆盖实际编译的 `kernel/non_gki/rules.c`，已按实际入口移植。
 
@@ -81,6 +82,12 @@ bash .github/scripts/generate-upstream-compat-patch.sh
 ```
 
 输出文件为 `artifacts/sukisu-ultra-builtin-non-gki-compat.patch`。更新上游基线后设置 `UPSTREAM_REF` 再生成，便于审查兼容逻辑并移植到后续版本。
+
+生成补丁前脚本会同时比较官方 `main` 的 Manager UAPI。仓库中的 `Check upstream Manager UAPI` 工作流也会每周检查一次；如果上游增加协议版本，检查会明确失败并要求先移植真实协议，防止仅修改版本号造成伪兼容。可在已拉取官方 `main` 后手动运行：
+
+```sh
+UPSTREAM_MANAGER_REF=upstream/main bash .github/scripts/check-manager-uapi-sync.sh
+```
 
 示范模板位于 `.github/workflows/temple/build-custom-kernel-example.yml`。GitHub 不会执行 `temple/` 子目录中的文件；需要实际运行时请使用根目录的活动工作流。
 

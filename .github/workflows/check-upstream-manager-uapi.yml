@@ -1,0 +1,36 @@
+name: Check upstream Manager UAPI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 0'
+  push:
+    paths:
+      - '.github/workflows/check-upstream-manager-uapi.yml'
+      - '.github/scripts/check-manager-uapi-sync.sh'
+      - '.github/tests/test-manager-uapi-compat.sh'
+      - 'kernel/include/uapi/supercall.h'
+      - 'kernel/supercall/**'
+      - 'kernel/feature/sucompat.c'
+
+permissions:
+  contents: read
+
+jobs:
+  check-uapi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout compatibility source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch official Manager protocol
+        run: |
+          git remote add upstream https://github.com/SukiSU-Ultra/SukiSU-Ultra.git 2>/dev/null || true
+          git fetch --no-tags --depth=1 upstream main
+
+      - name: Verify implemented UAPI
+        run: |
+          bash .github/tests/test-manager-uapi-compat.sh
+          UPSTREAM_MANAGER_REF=upstream/main bash .github/scripts/check-manager-uapi-sync.sh

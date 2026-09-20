@@ -46,3 +46,11 @@ The first complete-link attempt also exposed two mismatches with the supplied le
 ## Scope
 
 This is a compile and link verification against the named 4.9 kernel tree. Runtime boot and device-side SELinux hide behavior require flashing on the target device and are not claimed by this verification.
+
+## Manager UAPI 4 verification
+
+The official `Build Manager` run `34761911123` built commit `7755cdb36f63945f286d7b1cab662b42b18f2789`. Its Manager compares the kernel and Manager UAPI versions and reports that the kernel must be updated when the Manager version is newer. The corresponding upstream protocol is UAPI 4.
+
+This port implements the intervening UAPI 3 scoped su-session descriptor rather than only changing the reported number. On the SUSFS inline-hook path, the descriptor is installed from the existing post-exec hook only when the intercepted `su -> ksud` exec succeeds. UAPI 4's bundled-LKM flag is also defined; a built-in kernel correctly leaves it clear.
+
+The updated unity object was force-rebuilt with the same 4.9/clang 12 environment described above. `drivers/kernelsu/ksu.o` compiled successfully and contains both the `[ksu_driver_su]` descriptor name and the post-exec failure diagnostic. Static regression tests also verify the two ioctls authorized for the scoped descriptor and compare the local UAPI version with the official Manager source.
