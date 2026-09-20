@@ -37,6 +37,18 @@ grep -q 'CONFIG_QCA_CLD_WLAN' "$module_root/Makefile" || {
   exit 0
 }
 
+# Some downstream qcacld trees concatenate an include variable that already
+# contains "-I <path>" into a second include path. Clang then receives the
+# trailing path as a bare input file. Repair only that exact broken expression.
+qcacld_kbuild="$module_root/Kbuild"
+broken_gpio_include='-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)'
+if [[ -f "$qcacld_kbuild" ]] && grep -Fq -- "$broken_gpio_include" "$qcacld_kbuild"; then
+  sed -i 's|-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)|$(UMAC_TARGET_GPIO_INC)|' "$qcacld_kbuild"
+  grep -Fq -- "$broken_gpio_include" "$qcacld_kbuild" &&
+    die 'failed to repair malformed qcacld GPIO include path'
+  echo '[+] Repaired malformed qcacld GPIO include path'
+fi
+
 mkdir -p "$artifact/modules/vendor/lib/modules"
 echo '[+] Building Qualcomm qcacld-3.0 WLAN module'
 kernel_kcflags=${KCFLAGS:-}

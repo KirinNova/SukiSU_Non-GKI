@@ -11,6 +11,10 @@ module_root="$kernel_root/drivers/staging/qcacld-3.0"
 mkdir -p "$module_root" "$kernel_root/out" "$artifact_dir" "$fake_bin"
 printf 'CONFIG_QCA_CLD_WLAN=m\n' > "$module_root/Makefile"
 printf 'config QCA_CLD_WLAN\n' > "$module_root/Kconfig"
+printf '%s\n' \
+  'UMAC_TARGET_GPIO_INC := -I $(srctree)/$(WLAN_COMMON_INC)/target_if/gpio' \
+  'UMAC_GPIO_INC += -I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)' \
+  > "$module_root/Kbuild"
 
 printf '%s\n' \
   '#!/usr/bin/env bash' \
@@ -53,6 +57,8 @@ grep -qx 'modules' "$work/make.args"
 ! grep -q '^M=/' "$work/make.args"
 ! grep -q '^WLAN_ROOT=' "$work/make.args"
 ! grep -q '^MODNAME=' "$work/make.args"
+grep -Fqx 'UMAC_GPIO_INC += $(UMAC_TARGET_GPIO_INC)' "$module_root/Kbuild"
+! grep -Fq -- '-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)' "$module_root/Kbuild"
 
 printf '%s\n' \
   '#!/usr/bin/env bash' \
