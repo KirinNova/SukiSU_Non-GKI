@@ -14,6 +14,6 @@ grep -q 'ksu_is_su_session_fd' kernel/supercall/dispatch.c
 grep -A5 'KSU_IOCTL_GET_WRAPPER_FD' kernel/supercall/dispatch.c | grep -q 'allow_su_session = true'
 grep -A5 'KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT' kernel/supercall/dispatch.c | grep -q 'allow_su_session = true'
 grep -A20 'ksu_handle_post_execveat_sucompat' kernel/feature/sucompat.c | grep -q 'ksu_install_su_fd'
-grep -A20 'ksu_install_file_wrapper' kernel/infra/file_wrapper.c | grep -q 'override_creds(ksu_cred)'
+grep -A40 'ksu_install_file_wrapper' kernel/infra/file_wrapper.c | grep -q 'override_creds(ksu_cred)'
 
 echo '[+] Manager UAPI compatibility tests passed'
