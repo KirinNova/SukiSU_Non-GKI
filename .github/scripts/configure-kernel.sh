@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "${KERNEL_ROOT:?}"; out=${OUT_DIR:-out}; export OUT_DIR="$out"; export ARCH=${ARCH:-arm64} SUBARCH=${SUBARCH:-$ARCH}
+cd "${KERNEL_ROOT:?}"; out=${OUT_DIR:-out}; export OUT_DIR="$out"
+export ARCH=${ARCH:-arm64}
+export SUBARCH=${SUBARCH:-$ARCH}
 export KBUILD_BUILD_USER=${AUTHOR:-XiZi} KBUILD_BUILD_HOST=GitHub-Actions KBUILD_BUILD_TIMESTAMP=${BUILD_TIME:-$(date -u '+%Y-%m-%d %H:%M:%S')}
 # Some non-GKI arm64 kernels (including 4.9 trees) validate the 32-bit
 # compat-vDSO toolchain while parsing the Makefile during configuration.
@@ -151,6 +153,30 @@ fi
 if [[ -n "${GITHUB_ENV:-}" ]]; then
   printf 'VENDOR_SPK_ID_STATUS=%s\n' "$spk_id_status" >> "$GITHUB_ENV"
 fi
+
+# Android vendor partitions normally load qcacld as a release-matched module.
+# A custom localversion makes that stock module unusable, while a generic AK3
+# package cannot reliably update Android's modules.load/vendor_dlkm metadata.
+# Build the driver into the kernel when this complete Qualcomm layout exists.
+wlan_driver_status=not-present
+wlan_root=drivers/staging/qcacld-3.0
+if [[ -f "$wlan_root/Kconfig" && -f "$wlan_root/Kbuild" && \
+      -d drivers/staging/qca-wifi-host-cmn && -d drivers/staging/fw-api ]] && \
+   grep -q '^config QCA_CLD_WLAN$' "$wlan_root/Kconfig"; then
+  broken_gpio_include='-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)'
+  if grep -Fq -- "$broken_gpio_include" "$wlan_root/Kbuild"; then
+    sed -i 's|-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)|$(UMAC_TARGET_GPIO_INC)|' "$wlan_root/Kbuild"
+    grep -Fq -- "$broken_gpio_include" "$wlan_root/Kbuild" && {
+      echo '[ERROR] failed to repair malformed qcacld GPIO include path' >&2
+      exit 1
+    }
+    echo '[+] repaired malformed qcacld GPIO include path'
+  fi
+  set_config CONFIG_QCA_CLD_WLAN y
+  wlan_driver_status=builtin-requested
+  echo '[+] requested built-in Qualcomm qcacld WLAN driver'
+fi
+
 date_part=$(date -u -d "$KBUILD_BUILD_TIMESTAMP" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); local="-${KERNEL_NAME:-by_XiZi}-${KERNEL_VERSION:-v1.0}-$date_part"
 sed -i '/^CONFIG_LOCALVERSION=/d' "$out/.config"; printf 'CONFIG_LOCALVERSION="%s"\n' "$local" >> "$out/.config"
 # Never append -g<commit>-dirty: all integrations intentionally change the
@@ -160,6 +186,16 @@ if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
   kernelrelease_args=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}${local}")
 fi
 make O="$out" "${kernelrelease_args[@]}" olddefconfig
+if [[ "$wlan_driver_status" == builtin-requested ]]; then
+  grep -q '^CONFIG_QCA_CLD_WLAN=y$' "$out/.config" || {
+    echo '[ERROR] qcacld is present, but Kconfig did not retain CONFIG_QCA_CLD_WLAN=y' >&2
+    exit 1
+  }
+  wlan_driver_status=builtin
+fi
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  printf 'WLAN_DRIVER_STATUS=%s\n' "$wlan_driver_status" >> "$GITHUB_ENV"
+fi
 if [[ "$spk_id_status" == enabled ]]; then
   grep -q '^CONFIG_MFD_SPK_ID=y$' "$out/.config" || {
     echo '[ERROR] TAS2557 requires CONFIG_MFD_SPK_ID, but Kconfig did not retain it' >&2
