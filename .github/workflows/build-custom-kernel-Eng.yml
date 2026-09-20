@@ -293,6 +293,11 @@ jobs:
             printf 'KERNEL_IMAGES_CAPTURED=%s\n' "${captured_targets[*]}" >> "$GITHUB_ENV"
           fi
 
+      - name: Build Qualcomm WLAN module when supported by the source tree
+        if: inputs.package_ak3
+        shell: bash
+        run: bash .github/scripts/build-kernel-modules.sh
+
       - name: Package AnyKernel3
         if: inputs.package_ak3
         shell: bash

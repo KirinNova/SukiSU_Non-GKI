@@ -19,6 +19,7 @@ start=${BUILD_START_EPOCH:-$end}
   echo "- 已捕获内核镜像: ${KERNEL_IMAGES_CAPTURED:-unknown}"
   echo "- AnyKernel3 打包目标: ${AK3_KERNEL_TARGET:-not-packaged}"
   echo "- AnyKernel3 槽位模式: ${AK3_SLOT_MODE:-not-packaged}"
+  echo "- Qualcomm WLAN 模块: ${WLAN_MODULE_STATUS:-not-run} (${WLAN_MODULE_NAMES:-none})"
   echo "- 内核工具版本检测脚本: ${MIN_TOOL_VERSION_STATUS:-not-run}"
   echo "- 上游发行后缀处理: ${VENDOR_LOCALVERSION_STATUS:-not-run}"
   echo "- TAS2557 speaker-ID 厂商依赖: ${VENDOR_SPK_ID_STATUS:-not-needed}"

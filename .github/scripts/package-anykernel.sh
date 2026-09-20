@@ -16,6 +16,12 @@ git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$artifact/AnyKern
 # the active slot on A/B devices and falls back to the unsuffixed boot
 # partition on legacy devices.
 ak="$artifact/AnyKernel3"; slot_mode=auto
+module_mode=0
+if [[ "${WLAN_MODULE_STATUS:-skipped}" == built && -d "$artifact/modules" ]]; then
+  module_mode=1
+  mkdir -p "$ak/modules"
+  cp -a "$artifact/modules/." "$ak/modules/"
+fi
 if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'AK3_SLOT_MODE=%s\n' "$slot_mode" >> "$GITHUB_ENV"; fi
 cat > "$ak/anykernel.sh" <<EOF
 ### AnyKernel3 Ramdisk Mod Script
@@ -26,7 +32,7 @@ cat > "$ak/anykernel.sh" <<EOF
 properties() { '
 kernel.string=${CODENAME:?} SukiSU+Susfs集成内核 by${AUTHOR:-XiZi}
 do.devicecheck=1
-do.modules=0
+do.modules=$module_mode
 do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
@@ -66,4 +72,5 @@ cp "$kernel_image" "$ak/"
 if [[ -n "${GITHUB_ENV:-}" ]]; then printf 'AK3_KERNEL_TARGET=%s\n' "$ak3_target" >> "$GITHUB_ENV"; fi
 printf '%s SukiSU+Susfs集成内核 by%s\n内核版本:%s\n' "$CODENAME" "${AUTHOR:-XiZi}" "${KERNEL_NAME:-by_XiZi}" > "$ak/README_FLASH.txt"
 printf 'AK3 slot mode: %s (workflow AB_PARTITION=%s; resolved on device)\n' "$slot_mode" "${AB_PARTITION:-false}" >> "$ak/README_FLASH.txt"
+printf 'Qualcomm WLAN modules: %s (%s)\n' "${WLAN_MODULE_STATUS:-skipped}" "${WLAN_MODULE_NAMES:-none}" >> "$ak/README_FLASH.txt"
 (cd "$ak" && zip -qr "$artifact/${CODENAME}-SukiSU-Non-GKI-AK3.zip" .)
