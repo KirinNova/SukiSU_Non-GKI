@@ -16,10 +16,17 @@ printf '%s\n' \
   '#!/usr/bin/env bash' \
   'set -euo pipefail' \
   'printf "%s\n" "$@" > "$FAKE_MAKE_ARGS"' \
-  'module_root=' \
-  'for arg in "$@"; do case "$arg" in M=*) module_root=${arg#M=} ;; esac; done' \
-  '[[ -n "$module_root" ]]' \
-  'printf fake-module > "$module_root/wlan.ko"' \
+  'kernel_root= output_dir= module_rel=' \
+  'previous=' \
+  'for arg in "$@"; do' \
+  '  if [[ "$previous" == -C ]]; then kernel_root=$arg; fi' \
+  '  case "$arg" in O=*) output_dir=${arg#O=} ;; M=*) module_rel=${arg#M=} ;; esac' \
+  '  previous=$arg' \
+  'done' \
+  '[[ -n "$kernel_root" && -n "$output_dir" && -n "$module_rel" ]]' \
+  '[[ "$module_rel" != /* ]]' \
+  'mkdir -p "$output_dir/$module_rel"' \
+  'printf fake-module > "$output_dir/$module_rel/wlan.ko"' \
   > "$fake_bin/make"
 chmod +x "$fake_bin/make"
 
@@ -37,6 +44,15 @@ test -f "$artifact_dir/modules/vendor/lib/modules/wlan.ko"
 grep -qx 'WLAN_MODULE_STATUS=built' "$work/github.env"
 grep -qx 'WLAN_MODULE_NAMES=wlan.ko' "$work/github.env"
 grep -qx 'KERNELRELEASE=4.19.325-test' "$work/make.args"
+grep -qx -- "-C" "$work/make.args"
+grep -qx "$kernel_root" "$work/make.args"
+grep -qx "O=$kernel_root/out" "$work/make.args"
+grep -qx 'M=drivers/staging/qcacld-3.0' "$work/make.args"
+grep -qx 'CONFIG_QCA_CLD_WLAN=m' "$work/make.args"
+grep -qx 'modules' "$work/make.args"
+! grep -q '^M=/' "$work/make.args"
+! grep -q '^WLAN_ROOT=' "$work/make.args"
+! grep -q '^MODNAME=' "$work/make.args"
 
 printf '%s\n' \
   '#!/usr/bin/env bash' \
