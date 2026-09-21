@@ -64,6 +64,11 @@ on:
         required: true
         default: false
         type: boolean
+      force_selinux_enforcing:
+        description: 是否固定 SELinux 为 Enforcing（策略不兼容时可能无法启动）
+        required: true
+        default: false
+        type: boolean
       integrate_susfs:
         description: 是否集成最新版 SUSFS 和本仓库的 SukiSU 兼容版
         required: true
@@ -138,6 +143,7 @@ jobs:
       # DISABLE_LTO compiler-flags variable.
       DISABLE_LTO_REQUESTED: ${{ inputs.disable_lto }}
       IGNORE_WERROR_REQUESTED: ${{ inputs.ignore_werror }}
+      FORCE_SELINUX_ENFORCING: ${{ inputs.force_selinux_enforcing }}
       INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
       KERNEL_NAME: ${{ inputs.kernel_name }}
       BUILD_TIME: ${{ inputs.build_time }}

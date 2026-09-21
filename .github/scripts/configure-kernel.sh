@@ -134,6 +134,18 @@ if [[ "${IGNORE_WERROR_REQUESTED:-false}" == true ]]; then
   # -Werror flags in old vendor Kbuild files without changing source code.
   set_config CONFIG_CC_WERROR n
 fi
+# CONFIG_SECURITY_SELINUX_DEVELOP makes SELinux start permissive unless the
+# boot command line explicitly contains enforcing=1. Some Android vendor boot
+# images do not pass that parameter, which leaves /sys/fs/selinux/enforce at 0.
+# Apply the deterministic configuration fix only when explicitly requested;
+# otherwise preserve the kernel tree's original SELinux policy completely.
+selinux_enforcing_status=unchanged
+if [[ "${FORCE_SELINUX_ENFORCING:-false}" == true ]]; then
+  set_config CONFIG_SECURITY_SELINUX y
+  set_config CONFIG_SECURITY_SELINUX_DEVELOP n
+  selinux_enforcing_status=requested
+  echo '[+] requested fixed SELinux enforcing mode by disabling development support'
+fi
 # Some vendor SDM845 trees keep the TAS2557 caller enabled while leaving the
 # speaker-ID provider as an optional MFD symbol. That combination compiles all
 # objects but fails at the final vmlinux link with an undefined
@@ -186,6 +198,20 @@ if [[ -n "${KERNELRELEASE_OVERRIDE_BASE:-}" ]]; then
   kernelrelease_args=("KERNELRELEASE=${KERNELRELEASE_OVERRIDE_BASE}${local}")
 fi
 make O="$out" "${kernelrelease_args[@]}" olddefconfig
+if [[ "$selinux_enforcing_status" == requested ]]; then
+  grep -q '^CONFIG_SECURITY_SELINUX=y$' "$out/.config" || {
+    echo '[ERROR] SELinux enforcing was requested, but Kconfig did not retain CONFIG_SECURITY_SELINUX=y' >&2
+    exit 1
+  }
+  grep -q '^# CONFIG_SECURITY_SELINUX_DEVELOP is not set$' "$out/.config" || {
+    echo '[ERROR] SELinux enforcing was requested, but Kconfig did not disable CONFIG_SECURITY_SELINUX_DEVELOP' >&2
+    exit 1
+  }
+  selinux_enforcing_status=forced
+fi
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  printf 'SELINUX_ENFORCING_STATUS=%s\n' "$selinux_enforcing_status" >> "$GITHUB_ENV"
+fi
 if [[ "$wlan_driver_status" == builtin-requested ]]; then
   grep -q '^CONFIG_QCA_CLD_WLAN=y$' "$out/.config" || {
     echo '[ERROR] qcacld is present, but Kconfig did not retain CONFIG_QCA_CLD_WLAN=y' >&2

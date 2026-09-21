@@ -64,6 +64,11 @@ on:
         required: true
         default: false
         type: boolean
+      force_selinux_enforcing:
+        description: Force SELinux enforcing (an incompatible policy may prevent booting)
+        required: true
+        default: false
+        type: boolean
       integrate_susfs:
         description: Integrate latest SUSFS and this repository's SukiSU compatibility
         required: true
@@ -138,6 +143,7 @@ jobs:
       # DISABLE_LTO compiler-flags variable.
       DISABLE_LTO_REQUESTED: ${{ inputs.disable_lto }}
       IGNORE_WERROR_REQUESTED: ${{ inputs.ignore_werror }}
+      FORCE_SELINUX_ENFORCING: ${{ inputs.force_selinux_enforcing }}
       INTEGRATE_SUSFS: ${{ inputs.integrate_susfs }}
       KERNEL_NAME: ${{ inputs.kernel_name }}
       BUILD_TIME: ${{ inputs.build_time }}
