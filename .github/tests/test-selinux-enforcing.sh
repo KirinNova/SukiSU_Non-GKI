@@ -35,27 +35,45 @@ run_configure() {
 }
 
 forced_root="$work/forced"
-mkdir -p "$forced_root"
+mkdir -p "$forced_root/security/selinux"
+cat > "$forced_root/security/selinux/selinuxfs.c" <<'EOF'
+static ssize_t sel_write_enforce(struct file *file)
+{
+	new_value = 0; /* forced permissive vendor hack */
+}
+EOF
 : > "$work/forced.env"
 run_configure "$forced_root" "$work/forced.env" true
 grep -qx 'CONFIG_SECURITY_SELINUX=y' "$forced_root/out/.config"
 grep -qx '# CONFIG_SECURITY_SELINUX_DEVELOP is not set' "$forced_root/out/.config"
 ! grep -qx 'CONFIG_SECURITY_SELINUX_DEVELOP=y' "$forced_root/out/.config"
+grep -q '^\s*new_value = !!new_value;$' "$forced_root/security/selinux/selinuxfs.c"
 grep -qx 'SELINUX_ENFORCING_STATUS=forced' "$work/forced.env"
+grep -qx 'SELINUX_SOURCE_REPAIR_STATUS=repaired-forced-permissive' "$work/forced.env"
 
 unchanged_root="$work/unchanged"
-mkdir -p "$unchanged_root"
+mkdir -p "$unchanged_root/security/selinux"
+cat > "$unchanged_root/security/selinux/selinuxfs.c" <<'EOF'
+static ssize_t sel_write_enforce(struct file *file)
+{
+	new_value = 0; /* forced permissive vendor hack */
+}
+EOF
 : > "$work/unchanged.env"
 run_configure "$unchanged_root" "$work/unchanged.env" false
 grep -qx 'CONFIG_SECURITY_SELINUX_DEVELOP=y' "$unchanged_root/out/.config"
+grep -q '^\s*new_value = 0;' "$unchanged_root/security/selinux/selinuxfs.c"
 grep -qx 'SELINUX_ENFORCING_STATUS=unchanged' "$work/unchanged.env"
+grep -qx 'SELINUX_SOURCE_REPAIR_STATUS=not-requested' "$work/unchanged.env"
 
 artifact_dir="$work/artifacts"
 ARTIFACT_DIR="$artifact_dir" \
 FORCE_SELINUX_ENFORCING=true \
 SELINUX_ENFORCING_STATUS=forced \
+SELINUX_SOURCE_REPAIR_STATUS=repaired-forced-permissive \
   bash "$repo_root/.github/scripts/generate-build-report.sh" >/dev/null
 grep -Fqx -- '- SELinux 固定 Enforcing: 请求=true; 状态=forced' "$artifact_dir/build-report.md"
+grep -Fqx -- '- SELinux 强制宽容源码修复: repaired-forced-permissive' "$artifact_dir/build-report.md"
 grep -Fq 'SELinux固定Enforcing=true' "$artifact_dir/build-report.md"
 
 echo '[+] optional SELinux enforcing tests passed'

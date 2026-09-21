@@ -140,7 +140,25 @@ fi
 # Apply the deterministic configuration fix only when explicitly requested;
 # otherwise preserve the kernel tree's original SELinux policy completely.
 selinux_enforcing_status=unchanged
+selinux_source_repair_status=not-requested
 if [[ "${FORCE_SELINUX_ENFORCING:-false}" == true ]]; then
+  selinuxfs=security/selinux/selinuxfs.c
+  [[ -f "$selinuxfs" ]] || {
+    echo "[ERROR] SELinux enforcing was requested, but $selinuxfs is missing" >&2
+    exit 1
+  }
+  enforce_writer=$(sed -n '/static ssize_t sel_write_enforce/,/^}/p' "$selinuxfs")
+  if grep -Eq '^[[:space:]]*new_value[[:space:]]*=[[:space:]]*0[[:space:]]*;' <<< "$enforce_writer"; then
+    sed -i -E '/static ssize_t sel_write_enforce/,/^}/{s/^([[:space:]]*)new_value[[:space:]]*=[[:space:]]*0[[:space:]]*;.*$/\1new_value = !!new_value;/;}' "$selinuxfs"
+    selinux_source_repair_status=repaired-forced-permissive
+    echo '[+] restored the standard SELinux enforce writer after detecting a forced-permissive source hack'
+  elif grep -Eq '^[[:space:]]*new_value[[:space:]]*=[[:space:]]*!!new_value[[:space:]]*;' <<< "$enforce_writer"; then
+    selinux_source_repair_status=standard
+  else
+    selinux_source_repair_status=unrecognized
+    echo '[ERROR] SELinux enforce writer does not contain a recognized standard or forced-permissive assignment' >&2
+    exit 1
+  fi
   set_config CONFIG_SECURITY_SELINUX y
   set_config CONFIG_SECURITY_SELINUX_DEVELOP n
   selinux_enforcing_status=requested
@@ -210,7 +228,8 @@ if [[ "$selinux_enforcing_status" == requested ]]; then
   selinux_enforcing_status=forced
 fi
 if [[ -n "${GITHUB_ENV:-}" ]]; then
-  printf 'SELINUX_ENFORCING_STATUS=%s\n' "$selinux_enforcing_status" >> "$GITHUB_ENV"
+  printf 'SELINUX_ENFORCING_STATUS=%s\nSELINUX_SOURCE_REPAIR_STATUS=%s\n' \
+    "$selinux_enforcing_status" "$selinux_source_repair_status" >> "$GITHUB_ENV"
 fi
 if [[ "$wlan_driver_status" == builtin-requested ]]; then
   grep -q '^CONFIG_QCA_CLD_WLAN=y$' "$out/.config" || {

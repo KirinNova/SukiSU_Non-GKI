@@ -25,6 +25,7 @@ start=${BUILD_START_EPOCH:-$end}
   echo "- TAS2557 speaker-ID 厂商依赖: ${VENDOR_SPK_ID_STATUS:-not-needed}"
   echo "- 编译器 Werror 降级: ${IGNORE_WERROR_REQUESTED:-false}"
   echo "- SELinux 固定 Enforcing: 请求=${FORCE_SELINUX_ENFORCING:-false}; 状态=${SELINUX_ENFORCING_STATUS:-not-run}"
+  echo "- SELinux 强制宽容源码修复: ${SELINUX_SOURCE_REPAIR_STATUS:-not-run}"
   echo "- 集成选择: SukiSU Ultra=是; SUSFS=${INTEGRATE_SUSFS:-false}; DroidSpaces=${INTEGRATE_DROIDSPACES:-false}; 机型专属补丁=${APPLY_DEVICE_PATCHES:-false}; 内核版本伪装=${SPOOF_KERNEL_VERSION:-false}; SELinux固定Enforcing=${FORCE_SELINUX_ENFORCING:-false}; LTO关闭=${DISABLE_LTO_REQUESTED:-false}; Werror降级=${IGNORE_WERROR_REQUESTED:-false}; A/B=${AB_PARTITION:-false}; AK3=${PACKAGE_AK3:-false}"
 
   if [[ "${SPOOF_KERNEL_VERSION:-false}" == true ]]; then
